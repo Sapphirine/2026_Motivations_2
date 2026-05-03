@@ -1,0 +1,29 @@
+node_modules/
+.wrangler/
+dist/
+.DS_Store
+*.log
+.env
+.dev.vars
+
+# Research-grade intermediate dumps (canonical evidence is served from R2).
+research-data/
+
+# Internal planning artifacts — not part of the published deliverable.
+01-spec.md
+02-design.md
+03-ui-design.md
+04-implementation-plan.md
+05-progress.md
+06-test-plan.md
+07-deployment.md
+.ux-map/
+navigationflow.md
+
+# Local/generated project artifacts.
+migrations/
+public/final_project.pdf
+
+# Local Playwright/QA helpers.
+/tmp/
+verify-*.js
