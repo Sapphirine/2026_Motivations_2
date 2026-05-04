@@ -90,6 +90,18 @@ function rateLimit(endpointTag: string) {
   };
 }
 
+app.get('/', (c) => c.json({
+  service: 'motiveops-api',
+  message: 'This is the local backend API. Open the frontend UI at http://localhost:5173.',
+  frontend: 'http://localhost:5173',
+  diagnostics: '/api/diagnostics',
+  usefulRoutes: [
+    '/api/diagnostics',
+    '/api/scenarios',
+    '/api/value-profiles',
+  ],
+}));
+
 app.get('/api/health', async (c) => {
   const checks: Record<string, { ok: boolean; detail?: string }> = {};
   if (c.env.DB) {
