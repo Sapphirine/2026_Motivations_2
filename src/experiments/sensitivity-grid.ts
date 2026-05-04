@@ -297,20 +297,32 @@ async function processOneCell(
   // run pinned to the same batteryId as the grid job.
   const baseline = await findBaselineModal(env, plan.scenarioId, plan.profileId, job.batteryId);
 
-  // Run one perturbed call.
-  const perturbedProfile = perturbAxis(profile, plan.axisId);
-  let perturbedOption: string | null = null;
-  let perturbedRationale = '';
-  let cellRunId = '';
+  const lowProfile = setAxisEndpoint(profile, plan.axisId, 0.2);
+  const highProfile = setAxisEndpoint(profile, plan.axisId, 0.8);
+  let lowOption: string | null = null;
+  let highOption: string | null = null;
+  let lowRationale = '';
+  let highRationale = '';
+  let lowCellRunId = '';
+  let highCellRunId = '';
+  const config = getConfig(env);
 
   try {
-    const result = await withBudget(
-      runProfileProvider(env, env.OPENAI_MODEL ?? 'gpt-5.4-nano', getConfig(env).generationSettings, scenario, perturbedProfile, userKey),
+    const lowResult = await withBudget(
+      runProfileProvider(env, env.OPENAI_MODEL ?? 'gpt-5.4-nano', config.generationSettings, scenario, lowProfile, userKey),
       PER_CELL_TIMEOUT_MS,
     );
-    perturbedOption = result.structuredDecision.selectedOptionId;
-    perturbedRationale = result.structuredDecision.rationale ?? '';
-    cellRunId = makeId('cellrun');
+    lowOption = lowResult.structuredDecision.selectedOptionId;
+    lowRationale = lowResult.structuredDecision.rationale ?? '';
+    lowCellRunId = makeId('celllow');
+
+    const highResult = await withBudget(
+      runProfileProvider(env, env.OPENAI_MODEL ?? 'gpt-5.4-nano', config.generationSettings, scenario, highProfile, userKey),
+      PER_CELL_TIMEOUT_MS,
+    );
+    highOption = highResult.structuredDecision.selectedOptionId;
+    highRationale = highResult.structuredDecision.rationale ?? '';
+    highCellRunId = makeId('cellhigh');
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {
@@ -326,20 +338,27 @@ async function processOneCell(
     };
   }
 
-  const flipped = baseline.option === null
+  const flipped = lowOption === null || highOption === null
     ? null
-    : baseline.option !== perturbedOption;
+    : lowOption !== highOption;
 
   const cell: SensitivityGridCell = {
     scenarioId: plan.scenarioId,
     profileId: plan.profileId,
     axisId: plan.axisId,
+    contrastMode: 'low_high',
+    lowOption,
+    highOption,
+    lowRationaleExcerpt: lowRationale.slice(0, 320),
+    highRationaleExcerpt: highRationale.slice(0, 320),
+    lowCellRunId,
+    highCellRunId,
     baselineOption: baseline.option,
     baselineStability: baseline.stability,
-    perturbedOption,
+    perturbedOption: highOption,
     flipped,
-    perturbedRationaleExcerpt: perturbedRationale.slice(0, 320),
-    cellRunId,
+    perturbedRationaleExcerpt: highRationale.slice(0, 320),
+    cellRunId: highCellRunId,
     completedAt: nowSeconds(),
   };
   return { cell };
@@ -374,13 +393,14 @@ async function findBaselineModal(
   return computeBaselineModal(outputs as AgentOutput[], profileId);
 }
 
-function perturbAxis(profile: ValueProfile, axisId: JudgeAxisId): ValueProfile {
+function setAxisEndpoint(profile: ValueProfile, axisId: JudgeAxisId, endpoint: 0.2 | 0.8): ValueProfile {
   const legacy = AXIS_JUDGE_TO_LEGACY[axisId];
+  const level: 'high' | 'low' = endpoint === 0.8 ? 'high' : 'low';
   const newWeights = profile.axisWeights.map((weight) => {
     if (weight.axis !== legacy) return weight;
-    return { ...weight, value: 0.2 as const, level: 'low' as const };
+    return { ...weight, value: endpoint, level };
   });
-  return { ...profile, axisWeights: newWeights };
+  return { ...profile, name: `${profile.name} (${axisId}=${level})`, axisWeights: newWeights };
 }
 
 async function withBudget<T>(promise: Promise<T>, milliseconds: number): Promise<T> {

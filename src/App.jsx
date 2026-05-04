@@ -361,8 +361,8 @@ function CanonicalBatteryCTA({ onRun, batteryState }) {
         <Activity aria-hidden="true" />
       </div>
       <p className="panel-note">
-        9 adoption cases × 4 profiles × 5 trials + 20-call same-profile baseline + 144-cell sensitivity grid + 9 moderator calls.
-        Approximately <strong>~353 live OpenAI calls</strong>; budget before running and expect <strong>~5-10 min</strong> wall clock.
+        9 adoption cases × 4 profiles × 5 trials + 20-call same-profile baseline + 144 low-vs-high sensitivity cells + 9 moderator calls.
+        Approximately <strong>~497 live OpenAI calls</strong>; budget before running and expect <strong>~10-20 min</strong> wall clock.
         Idempotent - re-running with the same key resumes pending cells.
       </p>
       <button
@@ -742,23 +742,23 @@ function BoundaryMapPanel({ heatmap, jobState, loading, onRefresh, onRunGrid, on
         {hasColoredCells ? (
           <>
             <p>
-              Each row is an adoption case, each major column is one of 4 motivational profiles, and each profile splits into 4 sub-cells representing which motivation axis weight was forcibly weakened: Achievement, Self-direction, Security, or Benevolence.
+              Each row is an adoption case, each major column is one of 4 motivational profiles, and each profile splits into 4 sub-cells. Each sub-cell compares the intervention selected when that axis is set low (0.2) versus high (0.8).
             </p>
             <ul className="heatmap-explainer-legend">
               <li>
                 <span className="hm-legend-dot hm-legend-flip" aria-hidden="true" />
-                <strong>Red</strong> - agent changed its intervention when that axis was lowered, revealing the <em>load-bearing</em> motivation in that adoption case.
+                <strong>Red</strong> - low and high endpoint settings selected different interventions, revealing a <em>load-bearing</em> motivation in that adoption case.
               </li>
               <li>
                 <span className="hm-legend-dot hm-legend-noflip" aria-hidden="true" />
-                <strong>Green</strong> - intervention held under perturbation.
+                <strong>Green</strong> - intervention held across the low-vs-high contrast.
               </li>
               <li>
                 <span className="hm-legend-dot hm-legend-inconclusive" aria-hidden="true" />
-                <strong>Gray</strong> - baseline modal stability &lt; 0.6 (inconclusive).
+                <strong>Gray</strong> - endpoint contrast unavailable or inconclusive.
               </li>
             </ul>
-            <p className="heatmap-explainer-hint">Click any cell for the baseline-vs-perturbed intervention pair.</p>
+            <p className="heatmap-explainer-hint">Click any cell for the low-vs-high intervention pair.</p>
           </>
         ) : (
           <p className="heatmap-explainer-hint">Waiting for sensitivity cells. Progress can be checked above while the 144-cell grid is pending.</p>
@@ -875,9 +875,9 @@ function MethodologyDetails() {
       <details>
         <summary>Sensitivity grid (144 cells)</summary>
         <p>
-          For each (adoption case × profile × axis), perturb the named axis weight to 0.2 and re-run one
-          {' '}<code>{ACTIVE_MODEL}</code> trial. Compare the perturbed selected option to the
-          baseline 5-trial modal option and classify whether the perturbation changed the recommended intervention.
+          For each (adoption case × profile × axis), hold all non-target axes fixed, set the target axis
+          to low (<code>0.2</code>) and high (<code>0.8</code>), and run one <code>{ACTIVE_MODEL}</code>
+          trial at each endpoint. A red cell means the low-vs-high contrast changed the recommended intervention.
         </p>
       </details>
 
@@ -954,7 +954,7 @@ function LocalEvaluationPanel() {
             <div><dt>Modal stability</dt><dd>{formatPercent(summary.stability?.averageModalStability)}</dd></div>
             <div><dt>Divergent cases</dt><dd>{formatPercent(summary.profileDivergence?.divergentScenarioRate)}</dd></div>
             <div><dt>Card complete</dt><dd>{formatPercent(summary.interventionCardCompleteness?.completeOutputRate)}</dd></div>
-            <div><dt>Flip rate</dt><dd>{formatPercent(summary.sensitivityGrid?.flipRate)}</dd></div>
+            <div><dt>Endpoint flip rate</dt><dd>{formatPercent(summary.sensitivityGrid?.flipRate)}</dd></div>
           </dl>
           <ul className="artifact-list local-evaluation-list">
             <li><strong>Same-profile baseline</strong>: {summary.sameProfileBaseline?.completedCalls ?? 0}/20 calls, average modal stability {formatPercent(summary.sameProfileBaseline?.averageModalStability)}.</li>
@@ -1741,9 +1741,9 @@ function App() {
             <div><span className="eyebrow">Flip semantics</span><h2 id="flip-readme-title">What a red cell means</h2></div>
           </div>
           <p className="panel-note">
-            Each cell perturbs <em>one axis weight</em> from the profile default to <code>0.2</code>, then re-runs the
-            adoption case once. Red = perturbed run picked a different intervention than the baseline 5-trial modal. Green =
-            intervention is robust to that single-axis change. Gray = baseline modal stability &lt; 0.6 (inconclusive).
+            Each cell holds all non-target axes fixed, sets one target axis to <code>0.2</code> and <code>0.8</code>,
+            then compares the two selected interventions. Red = endpoint contrast changed the intervention. Green =
+            intervention is robust across low and high settings. Gray = contrast unavailable or inconclusive.
           </p>
         </section>
       ),

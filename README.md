@@ -79,7 +79,8 @@ The app still uses the same experiment shape:
 4. Judge the chosen intervention with a separate model.
 5. Extract the rationale motivation.
 6. Classify L1/L2/L3 alignment.
-7. Run a 144-cell sensitivity grid to find load-bearing motivation axes.
+7. Run a 144-cell sensitivity grid to find load-bearing motivation axes. Each
+   cell compares low (`0.2`) versus high (`0.8`) settings for one target axis.
 
 ## Behavioral Intervention Playbook
 
@@ -224,7 +225,8 @@ The paper-grade evaluation path is the canonical battery:
 
 - 9 adoption cases x 4 profiles x 5 trials = 180 subject-model outputs.
 - 20 same-profile baseline calls for the coding-assistant case.
-- 144 sensitivity-grid cells, one weakened motivation axis per case/profile.
+- 144 sensitivity-grid cells. Each cell runs two endpoint calls for one target
+  axis, setting it low (`0.2`) and high (`0.8`) while holding other axes fixed.
 - L1/L2/L3 audit for the 180 subject outputs.
 
 This repo now has a standalone local runner, so you do not need the remote
@@ -319,13 +321,17 @@ The local runner completed the paper-grade live OpenAI evaluation with
 
 - 180/180 subject-model outputs.
 - 20/20 same-profile baseline calls.
-- 144/144 sensitivity-grid perturbation cells with 0 grid errors.
+- 144/144 sensitivity-grid low-vs-high contrast cells with 0 grid errors.
 - Average modal stability: `86.1%`.
 - Divergent scenario rate: `44.4%`.
 - Intervention-card complete output rate: `100.0%`.
 - Three-layer audit coverage: `180/180`.
-- Sensitivity flip rate: `23.6%`.
+- Previous sensitivity-grid flip rate: `23.6%`.
 - Same-profile baseline average modal stability: `90.0%`.
+
+These values were generated before the low-vs-high contrast grid update. Rerun
+`npm run eval:local -- --live --reset` before using final sensitivity-grid
+numbers in the report.
 
 The generated live summary is in
 `evaluation-results/local-canonical-evaluation.summary.json`, the frontend reads
@@ -348,10 +354,9 @@ It should prove that MotiveOps is doing adoption-specific work:
   1.00`.
 - **Canonical sensitivity battery**: `npm run eval:local` reports subject
   completion, profile-cell modal stability, profile divergence, three-layer
-  audit coverage, same-profile baseline stability, and the 144-cell sensitivity
-  flip rate. Current live values are `86.1%` average modal stability, `44.4%`
-  divergent scenario rate, `100.0%` audit coverage, `90.0%` same-profile
-  baseline stability, and `23.6%` sensitivity flip rate.
+  audit coverage, same-profile baseline stability, and the 144-cell endpoint
+  flip rate. Rerun the live evaluation after grid-method changes
+  before reporting final values.
 - **Bad advice detection**: the regression fixture marks "Use AI for all coding
   tasks this week to maximize productivity" as `Contradictory` for the
   low-trust/security-anxiety case.

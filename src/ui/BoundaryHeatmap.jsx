@@ -7,7 +7,7 @@ import HeatmapCellModal from './HeatmapCellModal.jsx';
  * Layout:
  *   - 9 rows = AI workflow adoption cases clustered into 3 groups
  *   - 16 columns = 4 profiles × 4 axes per profile
- *   - Color: red flipped / green no-flip / gray inconclusive
+ *   - Color: red low/high endpoint flip / green no endpoint flip / gray inconclusive
  *
  * Cell hover -> tooltip via SVG <title>; cell click -> HeatmapCellModal.
  *
@@ -102,7 +102,7 @@ export default function BoundaryHeatmap({
       <svg
         viewBox={`0 0 ${totalWidth} ${totalHeight}`}
         role="img"
-        aria-label="9-by-16 sensitivity heatmap. Red intervention changed, green no change, gray inconclusive."
+        aria-label="9-by-16 sensitivity heatmap. Red low-high endpoint contrast changed intervention, green no change, gray inconclusive."
         className="boundary-heatmap-svg"
       >
         {/* Profile column headers */}
@@ -204,8 +204,8 @@ export default function BoundaryHeatmap({
       </svg>
 
       <div className="hm-legend" aria-label="Heatmap legend">
-        <span><span className="hm-swatch" style={{ background: FLIP_COLOR }} /> flipped</span>
-        <span><span className="hm-swatch" style={{ background: NOFLIP_COLOR }} /> no flip</span>
+        <span><span className="hm-swatch" style={{ background: FLIP_COLOR }} /> endpoint flip</span>
+        <span><span className="hm-swatch" style={{ background: NOFLIP_COLOR }} /> no endpoint flip</span>
         <span><span className="hm-swatch" style={{ background: INCONCLUSIVE_COLOR }} /> inconclusive</span>
         <span><span className="hm-swatch" style={{ background: PENDING_COLOR }} /> pending</span>
       </div>

@@ -233,6 +233,13 @@ export type SensitivityGridCell = {
   scenarioId: string;
   profileId: ProfileId;
   axisId: JudgeAxisId;
+  contrastMode?: 'low_high';
+  lowOption?: string | null;
+  highOption?: string | null;
+  lowRationaleExcerpt?: string;
+  highRationaleExcerpt?: string;
+  lowCellRunId?: string;
+  highCellRunId?: string;
   baselineOption: string | null;
   baselineStability: number;
   perturbedOption: string | null;

@@ -12,8 +12,9 @@
  *      coding-assistant-low-trust-evaluation-anxiety,
  *      4 profiles, 5 trials each = 20 calls. Stored in
  *      same_profile_baseline_runs.
- *   3. Sensitivity grid: 9 × 4 × 4 = 144 cells; idempotency_key pinned to
- *      this battery so re-running resumes.
+ *   3. Sensitivity grid: 9 × 4 × 4 = 144 cells; each cell runs low and high
+ *      target-axis endpoints, for 288 contrast calls. idempotency_key pinned
+ *      to this battery so re-running resumes.
  *
  * Idempotency: the umbrella endpoint accepts an `idempotencyKey`. On a
  * duplicate call, the existing batteryId is returned with the same
@@ -173,7 +174,7 @@ export async function startCanonicalBattery(
     runIds,
     baselineRunIds,
     // Real grid job id is not known synchronously — it is INSERTed only
-    // after main battery + baseline finish (~5-10 min wall clock). Clients
+    // after main battery + baseline finish (~10-20 min wall clock). Clients
     // poll GET /api/sensitivity-grid?batteryId={batteryId} (Lane E follow-up)
     // or GET /api/findings/heatmap (uses most-recent terminal grid job).
     gridJobId: `pending::will-start-after-main-battery::${batteryId}`,
@@ -199,7 +200,7 @@ async function runOneSameProfileTrial(
   const result = await runProfileProvider(
     env,
     env.OPENAI_MODEL ?? 'gpt-5.4-nano',
-    { temperature: 0.2, maxTokens: 1200 },
+    { temperature: 0.2, maxTokens: 2500 },
     scenario,
     profiles[0],
     userKey,

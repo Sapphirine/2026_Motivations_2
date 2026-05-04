@@ -227,13 +227,14 @@ function summarizeGrid(gridJob: SensitivityGridJob | null) {
       completedCells: 0,
       failedCells: 0,
       flipRate: 0,
+      contrastAvailableRate: 0,
       baselineAvailableRate: 0,
       averageBaselineStability: 0,
       axisFlipRates: {},
       profileFlipRates: {},
     };
   }
-  const completedWithBaseline = gridJob.results.filter((cell) => cell.flipped !== null);
+  const completedWithContrast = gridJob.results.filter((cell) => cell.flipped !== null);
   return {
     present: true,
     jobId: gridJob.id,
@@ -243,8 +244,9 @@ function summarizeGrid(gridJob: SensitivityGridJob | null) {
     completedCells: gridJob.completedCells,
     failedCells: gridJob.failedCells,
     completionRate: ratio(gridJob.completedCells, gridJob.totalCells),
-    flipRate: ratio(completedWithBaseline.filter((cell) => cell.flipped).length, completedWithBaseline.length),
-    baselineAvailableRate: ratio(completedWithBaseline.length, gridJob.results.length),
+    flipRate: ratio(completedWithContrast.filter((cell) => cell.flipped).length, completedWithContrast.length),
+    contrastAvailableRate: ratio(completedWithContrast.length, gridJob.results.length),
+    baselineAvailableRate: ratio(completedWithContrast.length, gridJob.results.length),
     averageBaselineStability: average(gridJob.results.map((cell) => cell.baselineStability)),
     axisFlipRates: groupFlipRates(gridJob.results, (cell) => cell.axisId),
     profileFlipRates: groupFlipRates(gridJob.results, (cell) => cell.profileId),

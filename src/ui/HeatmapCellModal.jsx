@@ -3,15 +3,15 @@ import { X, Loader2, CircleCheck, RefreshCw } from 'lucide-react';
 
 /**
  * HeatmapCellModal - opens on a BoundaryHeatmap cell click. Shows the
- * baseline option, the perturbed option, the flip flag, and the perturbed
- * rationale excerpt. Implements the §10.3 single-cell sensitivity probe.
+ * low/high endpoint options, the flip flag, and rationale excerpts.
+ * Implements the §10.3 single-cell sensitivity probe.
  *
  * Re-run feedback: the parent submits this cell to the active grid job's
  * retry-failed endpoint, then polling refreshes the heatmap after the batch lands.
  *
  * Props:
- *   cell:                { scenarioId, profileId, axisId, baselineOption,
- *                          perturbedOption, flipped, perturbedRationaleExcerpt,
+ *   cell:                { scenarioId, profileId, axisId, lowOption, highOption,
+ *                          flipped, lowRationaleExcerpt, highRationaleExcerpt,
  *                          stability }
  *   scenarioLabel:       human-readable adoption case name
  *   profileLabel:        human-readable profile name
@@ -41,12 +41,15 @@ export default function HeatmapCellModal({ cell, scenarioLabel, profileLabel, ax
 
   if (!cell) return null;
 
+  const hasEndpointContrast = cell.contrastMode === 'low_high' || cell.lowOption !== undefined || cell.highOption !== undefined;
   const flipState = cell.flipped === true ? 'flipped' : cell.flipped === false ? 'no-flip' : 'inconclusive';
-  const flipLabel = flipState === 'flipped' ? 'Intervention changed' : flipState === 'no-flip' ? 'No change' : 'Inconclusive (baseline unstable)';
+  const flipLabel = flipState === 'flipped' ? 'Intervention changed' : flipState === 'no-flip' ? 'No change' : 'Inconclusive';
 
   function handleRerun() {
     if (rerunning || typeof onRerun !== 'function') return;
     setPreviousSnapshot({
+      lowOption: cell.lowOption ?? null,
+      highOption: cell.highOption ?? null,
       perturbedOption: cell.perturbedOption ?? null,
       flipped: cell.flipped,
     });
@@ -109,17 +112,42 @@ export default function HeatmapCellModal({ cell, scenarioLabel, profileLabel, ax
         </div>
 
         <dl className="cell-modal-grid">
-          <div>
-            <dt>Baseline intervention</dt>
-            <dd>{cell.baselineOption ?? <span className="dim-note">(unstable - no modal)</span>}</dd>
-          </div>
-          <div>
-            <dt>Perturbed intervention (axis weight to 0.2)</dt>
-            <dd>{cell.perturbedOption ?? <span className="dim-note">(no perturbed run)</span>}</dd>
-          </div>
+          {hasEndpointContrast ? (
+            <>
+              <div>
+                <dt>Low endpoint intervention (axis = 0.2)</dt>
+                <dd>{cell.lowOption ?? <span className="dim-note">(no low-endpoint run)</span>}</dd>
+              </div>
+              <div>
+                <dt>High endpoint intervention (axis = 0.8)</dt>
+                <dd>{cell.highOption ?? <span className="dim-note">(no high-endpoint run)</span>}</dd>
+              </div>
+              <div>
+                <dt>Original baseline modal</dt>
+                <dd>{cell.baselineOption ?? <span className="dim-note">(no baseline available)</span>}</dd>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <dt>Baseline intervention</dt>
+                <dd>{cell.baselineOption ?? <span className="dim-note">(unstable - no modal)</span>}</dd>
+              </div>
+              <div>
+                <dt>Perturbed intervention</dt>
+                <dd>{cell.perturbedOption ?? <span className="dim-note">(no perturbed run)</span>}</dd>
+              </div>
+            </>
+          )}
         </dl>
 
-        {cell.perturbedRationaleExcerpt ? (
+        {hasEndpointContrast ? (
+          <div className="cell-modal-rationale">
+            <span className="eyebrow">Endpoint rationale excerpts</span>
+            {cell.lowRationaleExcerpt ? <p><strong>Low:</strong> {cell.lowRationaleExcerpt}</p> : null}
+            {cell.highRationaleExcerpt ? <p><strong>High:</strong> {cell.highRationaleExcerpt}</p> : null}
+          </div>
+        ) : cell.perturbedRationaleExcerpt ? (
           <div className="cell-modal-rationale">
             <span className="eyebrow">Perturbed rationale excerpt</span>
             <p>{cell.perturbedRationaleExcerpt}</p>
@@ -151,7 +179,11 @@ export default function HeatmapCellModal({ cell, scenarioLabel, profileLabel, ax
                 <div className="cell-rerun-cols">
                   <div>
                     <strong>Previous</strong>
-                    <p>Picked {previousSnapshot.perturbedOption ?? '-'}</p>
+                    <p>
+                      Picked {hasEndpointContrast
+                        ? `low ${previousSnapshot.lowOption ?? '-'} / high ${previousSnapshot.highOption ?? '-'}`
+                        : (previousSnapshot.perturbedOption ?? '-')}
+                    </p>
                     <p>
                       Flip:{' '}
                       {previousSnapshot.flipped === true

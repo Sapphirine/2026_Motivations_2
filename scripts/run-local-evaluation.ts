@@ -103,7 +103,7 @@ async function main() {
   console.log('[eval:local] running 20 same-profile baseline calls for the coding-assistant case');
   await runSameProfileBaseline(state, env, config.openAIModel, generationSettings);
 
-  console.log('[eval:local] running 144 one-axis perturbation cells');
+  console.log('[eval:local] running 144 low-vs-high axis contrast cells');
   await runSensitivityGrid(state, env, config.openAIModel, generationSettings);
 
   const runs = buildExperimentRuns(state, config.openAIModel, generationSettings);
@@ -204,20 +204,31 @@ async function runSensitivityGrid(state: RawState, env: Env, model: string, sett
     for (const profile of valueProfiles) {
       const baseline = computeBaselineModal(state.subjectOutputs, scenario.id, profile.id);
       for (const axisId of AXES) {
-        if (state.gridResults.some((cell) => cell.scenarioId === scenario.id && cell.profileId === profile.id && cell.axisId === axisId)) continue;
+        const existingIndex = state.gridResults.findIndex((cell) => cell.scenarioId === scenario.id && cell.profileId === profile.id && cell.axisId === axisId);
+        if (existingIndex >= 0 && state.gridResults[existingIndex]?.contrastMode === 'low_high') continue;
+        if (existingIndex >= 0) state.gridResults.splice(existingIndex, 1);
         try {
-          const perturbedProfile = perturbAxis(profile, axisId);
-          const result = await runProviderWithRetries(env, model, settings, scenario, perturbedProfile, `grid ${scenario.id} ${profile.id} ${axisId}`);
+          const lowProfile = setAxisEndpoint(profile, axisId, 0.2);
+          const highProfile = setAxisEndpoint(profile, axisId, 0.8);
+          const lowResult = await runProviderWithRetries(env, model, settings, scenario, lowProfile, `grid ${scenario.id} ${profile.id} ${axisId} low`);
+          const highResult = await runProviderWithRetries(env, model, settings, scenario, highProfile, `grid ${scenario.id} ${profile.id} ${axisId} high`);
           const cell: SensitivityGridCell = {
             scenarioId: scenario.id,
             profileId: profile.id,
             axisId,
+            contrastMode: 'low_high',
+            lowOption: lowResult.structuredDecision.selectedOptionId,
+            highOption: highResult.structuredDecision.selectedOptionId,
+            lowRationaleExcerpt: (lowResult.structuredDecision.rationale ?? '').slice(0, 320),
+            highRationaleExcerpt: (highResult.structuredDecision.rationale ?? '').slice(0, 320),
+            lowCellRunId: `localcell_low_${safeId(scenario.id)}_${profile.id}_${axisId}`,
+            highCellRunId: `localcell_high_${safeId(scenario.id)}_${profile.id}_${axisId}`,
             baselineOption: baseline.option,
             baselineStability: baseline.stability,
-            perturbedOption: result.structuredDecision.selectedOptionId,
-            flipped: baseline.option === null ? null : baseline.option !== result.structuredDecision.selectedOptionId,
-            perturbedRationaleExcerpt: (result.structuredDecision.rationale ?? '').slice(0, 320),
-            cellRunId: `localcell_${safeId(scenario.id)}_${profile.id}_${axisId}`,
+            perturbedOption: highResult.structuredDecision.selectedOptionId,
+            flipped: lowResult.structuredDecision.selectedOptionId !== highResult.structuredDecision.selectedOptionId,
+            perturbedRationaleExcerpt: (highResult.structuredDecision.rationale ?? '').slice(0, 320),
+            cellRunId: `localcell_high_${safeId(scenario.id)}_${profile.id}_${axisId}`,
             completedAt: nowSeconds(),
           };
           state.gridResults.push(cell);
@@ -369,14 +380,15 @@ function computeL1Top2(profile: ValueProfile): readonly [JudgeAxisId, JudgeAxisI
   return deriveL1Top2(weights);
 }
 
-function perturbAxis(profile: ValueProfile, axisId: JudgeAxisId): ValueProfile {
+function setAxisEndpoint(profile: ValueProfile, axisId: JudgeAxisId, endpoint: 0.2 | 0.8): ValueProfile {
   const legacyAxis = AXIS_JUDGE_TO_LEGACY[axisId];
+  const level: 'high' | 'low' = endpoint === 0.8 ? 'high' : 'low';
   return {
     ...profile,
-    name: `${profile.name} (${axisId} weakened)`,
+    name: `${profile.name} (${axisId}=${level})`,
     axisWeights: profile.axisWeights.map((weight) => {
       if (weight.axis !== legacyAxis) return weight;
-      return { ...weight, value: 0.2 as const, level: 'low' as const };
+      return { ...weight, value: endpoint, level };
     }),
   };
 }
@@ -504,7 +516,7 @@ function renderLatexResults(summary: any): string {
     `Card complete output rate & ${pct(summary.interventionCardCompleteness.completeOutputRate)} \\\\`,
     `Three-layer audit coverage & ${summary.threeLayerAudit.auditedOutputs}/180 (${pct(summary.threeLayerAudit.auditCoverage)}) \\\\`,
     `Sensitivity cells & ${summary.sensitivityGrid.completedCells}/144 (${pct(summary.sensitivityGrid.completionRate ?? 0)}) \\\\`,
-    `Sensitivity flip rate & ${pct(summary.sensitivityGrid.flipRate)} \\\\`,
+    `Endpoint flip rate & ${pct(summary.sensitivityGrid.flipRate)} \\\\`,
     `Same-profile baseline & ${summary.sameProfileBaseline.completedCalls}/20; average modal stability ${pct(summary.sameProfileBaseline.averageModalStability)} \\\\`,
     '\\bottomrule',
     '\\end{tabular}',
@@ -519,7 +531,7 @@ function printSummary(summary: any) {
   console.log(`[eval:local] subject outputs: ${summary.battery.subjectOutputs}/180`);
   console.log(`[eval:local] grid cells: ${summary.sensitivityGrid.completedCells}/144`);
   console.log(`[eval:local] average modal stability: ${pct(summary.stability.averageModalStability)}`);
-  console.log(`[eval:local] sensitivity flip rate: ${pct(summary.sensitivityGrid.flipRate)}`);
+  console.log(`[eval:local] endpoint flip rate: ${pct(summary.sensitivityGrid.flipRate)}`);
   console.log(`[eval:local] wrote ${SUMMARY_PATH}`);
   console.log(`[eval:local] wrote ${PUBLIC_SUMMARY_PATH}`);
   console.log(`[eval:local] wrote ${TEX_RESULTS_PATH}`);
