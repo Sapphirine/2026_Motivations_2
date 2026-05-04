@@ -888,12 +888,9 @@ function ArtifactLinks({ run }) {
       <ul className="artifact-list">
         {run?.id ? (
           <li>
-            Per-run JSON: <a href={`/api/artifacts/${encodeURIComponent(run.id)}`}>/api/artifacts/{run.id}</a>
+            Run detail JSON: <a href={`/api/experiments/${encodeURIComponent(run.id)}`}>/api/experiments/{run.id}</a>
           </li>
         ) : null}
-        <li>
-          Canonical evidence (battery): <a href="/api/research/canonical-evidence" download>Canonical adoption evidence - 392 KB JSON</a>
-        </li>
         <li>
           Evidence ledger: <a href="/api/evidence-ledger">/api/evidence-ledger</a>
         </li>

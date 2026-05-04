@@ -25,7 +25,7 @@ export function getConfig(env: Env): AppConfig {
     runTimeoutSeconds: Number(env.RUN_TIMEOUT_SECONDS ?? 25),
     artifactMaxBytes: Number(env.ARTIFACT_MAX_BYTES ?? 500_000),
     artifactRetentionDays: Number(env.ARTIFACT_RETENTION_DAYS ?? 14),
-    generationSettings: { temperature: 0.2, maxTokens: 1200 },
+    generationSettings: { temperature: 0.2, maxTokens: 2500 },
   };
 }
 
