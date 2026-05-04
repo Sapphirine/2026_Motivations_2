@@ -19,6 +19,7 @@ const runs = new Map<string, ExperimentRun>();
 const idempotency = new Map<string, string>();
 const customScenarios = new Map<string, Scenario>();
 const sensitivityRuns = new Map<string, SensitivityRun[]>();
+const gridJobs = new Map<string, SensitivityGridJob>();
 const unavailableD1 = new WeakSet<D1Database>();
 const initializedD1 = new WeakSet<D1Database>();
 const seededD1 = new WeakSet<D1Database>();
@@ -1031,6 +1032,11 @@ export async function updateAgentOutputThreeLayer(env: Env, output: AgentOutput)
 
 export async function insertGridJob(env: Env, job: SensitivityGridJob): Promise<{ inserted: boolean; job: SensitivityGridJob }> {
   if (!env.DB || unavailableD1.has(env.DB)) {
+    if (job.idempotencyKey) {
+      const existing = await getGridJobByIdempotencyKey(env, job.idempotencyKey);
+      if (existing) return { inserted: false, job: existing };
+    }
+    gridJobs.set(job.id, cloneGridJob(job));
     return { inserted: true, job };
   }
   try {
@@ -1069,7 +1075,10 @@ export async function insertGridJob(env: Env, job: SensitivityGridJob): Promise<
 }
 
 export async function updateGridJob(env: Env, job: SensitivityGridJob): Promise<void> {
-  if (!env.DB || unavailableD1.has(env.DB)) return;
+  if (!env.DB || unavailableD1.has(env.DB)) {
+    gridJobs.set(job.id, cloneGridJob(job));
+    return;
+  }
   await env.DB.prepare(`
     UPDATE sensitivity_grid_jobs
     SET status = ?, completed_cells = ?, failed_cells = ?, updated_at = ?,
@@ -1088,7 +1097,10 @@ export async function updateGridJob(env: Env, job: SensitivityGridJob): Promise<
 }
 
 export async function getGridJob(env: Env, jobId: string): Promise<SensitivityGridJob | undefined> {
-  if (!env.DB || unavailableD1.has(env.DB)) return undefined;
+  if (!env.DB || unavailableD1.has(env.DB)) {
+    const job = gridJobs.get(jobId);
+    return job ? cloneGridJob(job) : undefined;
+  }
   const row = await tryFirst(() => env.DB!.prepare(`
     SELECT id, battery_id, status, total_cells, completed_cells, failed_cells, error_budget,
       scenario_ids_json, profile_ids_json, axis_ids_json, results_json, errors_json,
@@ -1101,7 +1113,10 @@ export async function getGridJob(env: Env, jobId: string): Promise<SensitivityGr
 }
 
 export async function getGridJobByIdempotencyKey(env: Env, key: string): Promise<SensitivityGridJob | undefined> {
-  if (!env.DB || unavailableD1.has(env.DB)) return undefined;
+  if (!env.DB || unavailableD1.has(env.DB)) {
+    const job = [...gridJobs.values()].find((item) => item.idempotencyKey === key);
+    return job ? cloneGridJob(job) : undefined;
+  }
   const row = await tryFirst(() => env.DB!.prepare(`
     SELECT id, battery_id, status, total_cells, completed_cells, failed_cells, error_budget,
       scenario_ids_json, profile_ids_json, axis_ids_json, results_json, errors_json,
@@ -1114,7 +1129,12 @@ export async function getGridJobByIdempotencyKey(env: Env, key: string): Promise
 }
 
 export async function getGridJobByBatteryId(env: Env, batteryId: string): Promise<SensitivityGridJob | undefined> {
-  if (!env.DB || unavailableD1.has(env.DB)) return undefined;
+  if (!env.DB || unavailableD1.has(env.DB)) {
+    const job = [...gridJobs.values()]
+      .filter((item) => item.batteryId === batteryId)
+      .sort((a, b) => b.createdAt - a.createdAt)[0];
+    return job ? cloneGridJob(job) : undefined;
+  }
   const row = await tryFirst(() => env.DB!.prepare(`
     SELECT id, battery_id, status, total_cells, completed_cells, failed_cells, error_budget,
       scenario_ids_json, profile_ids_json, axis_ids_json, results_json, errors_json,
@@ -1133,7 +1153,12 @@ export async function getGridJobByBatteryId(env: Env, batteryId: string): Promis
  * terminal state.
  */
 export async function getMostRecentTerminalGridJob(env: Env): Promise<SensitivityGridJob | undefined> {
-  if (!env.DB || unavailableD1.has(env.DB)) return undefined;
+  if (!env.DB || unavailableD1.has(env.DB)) {
+    const job = [...gridJobs.values()]
+      .filter((item) => ['completed', 'partial', 'running'].includes(item.status))
+      .sort((a, b) => b.createdAt - a.createdAt)[0];
+    return job ? cloneGridJob(job) : undefined;
+  }
   const row = await tryFirst(() => env.DB!.prepare(`
     SELECT id, battery_id, status, total_cells, completed_cells, failed_cells, error_budget,
       scenario_ids_json, profile_ids_json, axis_ids_json, results_json, errors_json,
@@ -1167,9 +1192,15 @@ export async function getCanonicalHeatmapGridJob(
   env: Env,
   gridJobId?: string,
 ): Promise<SensitivityGridJob | undefined> {
-  if (!env.DB || unavailableD1.has(env.DB)) return undefined;
   if (gridJobId) {
     return getGridJob(env, gridJobId);
+  }
+  if (!env.DB || unavailableD1.has(env.DB)) {
+    const job = [...gridJobs.values()]
+      .filter((item) => item.status === 'completed' || item.status === 'partial')
+      .filter((item) => item.totalCells === 144 && item.completedCells >= 100)
+      .sort((a, b) => b.createdAt - a.createdAt)[0];
+    return job ? cloneGridJob(job) : undefined;
   }
   const row = await tryFirst(() => env.DB!.prepare(`
     SELECT id, battery_id, status, total_cells, completed_cells, failed_cells, error_budget,
@@ -1183,6 +1214,17 @@ export async function getCanonicalHeatmapGridJob(
     LIMIT 1
   `).first<GridJobRow>(), env.DB);
   return row ? hydrateGridJobRow(row) : undefined;
+}
+
+function cloneGridJob(job: SensitivityGridJob): SensitivityGridJob {
+  return {
+    ...job,
+    scenarioIds: [...job.scenarioIds],
+    profileIds: [...job.profileIds],
+    axisIds: [...job.axisIds],
+    results: job.results.map((cell) => ({ ...cell })),
+    errors: job.errors.map((error) => ({ ...error })),
+  };
 }
 
 type GridJobRow = {
