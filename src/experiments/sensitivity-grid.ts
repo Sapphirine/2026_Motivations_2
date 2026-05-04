@@ -31,6 +31,7 @@ import { getConfig } from '../services/config';
 import { computeBaselineModal } from '../services/experiment';
 import { runProfileProvider } from '../services/provider';
 import {
+  getScenario,
   getGridJob,
   insertGridJob,
   loadAgentOutputsWithThreeLayer,
@@ -275,7 +276,7 @@ async function processOneCell(
   plan: CellPlan,
   userKey?: string,
 ): Promise<{ cell?: SensitivityGridCell; error?: SensitivityGridCellError }> {
-  const scenario = presetScenarios.find((s) => s.id === plan.scenarioId);
+  const scenario = getScenario(plan.scenarioId);
   const profile = valueProfiles.find((p) => p.id === plan.profileId);
   if (!scenario || !profile) {
     return {

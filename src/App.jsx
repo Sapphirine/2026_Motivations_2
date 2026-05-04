@@ -6,7 +6,7 @@
  *   1. Setup              - adoption-case picker + motivation compass + canonical-battery CTA
  *   2. Run Live           - 4 AgentLane cards (summary-first)
  *   3. Three-Layer Analysis - per-agent ThreeLayerChart + AlignmentBadge
- *   4. Boundary Map       - 144-cell BoundaryHeatmap + job progress
+ *   4. Boundary Map       - sensitivity BoundaryHeatmap + job progress
  *   5. Method / Report    - PurposeCallout + methodology + Q&A + artifacts
  *
  * Backend contracts consumed (Lane A is implementing in parallel):
@@ -72,7 +72,7 @@ const tabs = [
     subtitle: 'Watch four motivated agents recommend interventions for the same adoption case.' },
   { id: 'three-layer', label: 'Three-Layer Analysis', detail: 'Declared · chosen · justified',
     subtitle: 'How declared, chosen, and justified intervention motivations agree or disagree.' },
-  { id: 'boundary',    label: 'Boundary Map',         detail: '144 contrasts - 288 endpoint calls',
+  { id: 'boundary',    label: 'Boundary Map',         detail: '16 single-case contrasts',
     subtitle: 'Which motivation weight actually changes the recommended intervention.' },
   { id: 'method',      label: 'Method / Report',      detail: 'Purpose · methodology · Q&A · evidence',
     subtitle: 'How the experiment is set up, and how to read the result.' },
@@ -98,6 +98,66 @@ const scenarioMeta = [
 ];
 const scenarioDetailsById = Object.fromEntries(presetScenarios.map((scenario) => [scenario.id, scenario]));
 const scenarios = scenarioMeta.map((meta) => ({ ...scenarioDetailsById[meta.id], ...meta }));
+const customOptionTemplates = [
+  {
+    id: 'option_a',
+    label: 'Outcome-focused adoption challenge',
+    description: 'Use a short, visible adoption challenge with a clear success metric. This favors speed, measurable progress, and productivity evidence.',
+  },
+  {
+    id: 'option_b',
+    label: 'Bounded safety pilot',
+    description: 'Use a reversible, low-risk pilot with a stop condition, review gate, and limited data or stakeholder exposure.',
+  },
+  {
+    id: 'option_c',
+    label: 'Stakeholder trust review',
+    description: 'Use peer or stakeholder review to protect psychological safety, legitimacy, fairness, and perceived care.',
+  },
+  {
+    id: 'option_d',
+    label: 'User-choice exploration sandbox',
+    description: 'Use an optional sandbox or menu of use cases so participants can discover fit before committing to deployment.',
+  },
+];
+const customScenarioExample = {
+  title: 'AI Tutor Deployment in Public Schools',
+  domain: 'education technology adoption',
+  context:
+    'A school district is deciding whether to deploy an AI tutor in public schools. It may improve learning outcomes and teacher capacity, but it could increase student surveillance, bias, and parent distrust if the rollout is not bounded.',
+  stakeholders: 'students, teachers, parents, school administrators, district technology team, equity reviewers',
+  tradeoffs: 'learning outcomes, student privacy, bias risk, teacher workload, public trust',
+  conflictNotes:
+    'Achievement may emphasize learning gains and faster support. Security should contain privacy and bias risks. Benevolence should protect students and teachers from harm. Self-direction should preserve educator and family choice during early use.',
+  decisionOptions: customOptionTemplates,
+};
+
+function makeEmptyCustomScenarioDraft() {
+  return {
+    title: '',
+    domain: '',
+    context: '',
+    stakeholders: 'decision owner, affected users, implementation team, governance reviewer',
+    tradeoffs: 'adoption value, trust, risk, autonomy',
+    conflictNotes: '',
+    decisionOptions: customOptionTemplates.map((option) => ({ ...option })),
+  };
+}
+
+function enrichCustomScenario(scenario) {
+  return {
+    ...scenario,
+    group: 'Custom scenario',
+    conflict: scenario.conflictNotes || 'User-authored adoption case',
+  };
+}
+
+function splitListInput(value) {
+  return String(value ?? '')
+    .split(/[\n,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
 
 const profiles = [
   { id: 'achievement',  name: 'Achievement',       tone: 'ROI and visible competence',       schwartz: 'Achievement · high', weights: { achievement: 0.8, self_direction: 0.5, security: 0.5, benevolence: 0.2 } },
@@ -220,15 +280,15 @@ function TabButton({ tab, active, onSelect }) {
 // ============================================================================
 // Setup tab: scenario picker + Schwartz Compass + canonical battery CTA
 // ============================================================================
-function ScenarioGroupedDropdown({ value, onChange }) {
+function ScenarioGroupedDropdown({ value, onChange, items = scenarios }) {
   const grouped = useMemo(() => {
     const map = new Map();
-    for (const s of scenarios) {
+    for (const s of items) {
       if (!map.has(s.group)) map.set(s.group, []);
       map.get(s.group).push(s);
     }
     return [...map.entries()];
-  }, []);
+  }, [items]);
 
   return (
     <label className="scenario-dropdown" htmlFor="scenario-select">
@@ -249,6 +309,31 @@ function ScenarioGroupedDropdown({ value, onChange }) {
         ))}
       </select>
     </label>
+  );
+}
+
+function ScenarioModeToggle({ mode, onChange }) {
+  return (
+    <div className="scenario-mode-toggle" role="tablist" aria-label="Scenario source">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === 'canonical'}
+        className={mode === 'canonical' ? 'is-active' : ''}
+        onClick={() => onChange('canonical')}
+      >
+        Canonical case
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === 'custom'}
+        className={mode === 'custom' ? 'is-active' : ''}
+        onClick={() => onChange('custom')}
+      >
+        Custom scenario
+      </button>
+    </div>
   );
 }
 
@@ -287,6 +372,141 @@ function ScenarioDetailPanel({ scenario }) {
       </div>
       <p className="dim-note scenario-conflict-note">{scenario.conflictNotes}</p>
     </div>
+  );
+}
+
+function CustomScenarioComposer({
+  draft,
+  onDraftChange,
+  onSubmit,
+  onLoadExample,
+  isSaving,
+  error,
+  customScenarios,
+  selectedScenarioId,
+  onSelectScenario,
+}) {
+  const updateField = (field, value) => onDraftChange((prev) => ({ ...prev, [field]: value }));
+  const updateOption = (index, field, value) => {
+    onDraftChange((prev) => ({
+      ...prev,
+      decisionOptions: prev.decisionOptions.map((option, optionIndex) => (
+        optionIndex === index ? { ...option, [field]: value } : option
+      )),
+    }));
+  };
+
+  return (
+    <form className="custom-scenario-form" onSubmit={onSubmit}>
+      {customScenarios.length > 0 ? (
+        <label className="scenario-dropdown custom-existing-select" htmlFor="custom-scenario-select">
+          <span className="eyebrow">Saved custom scenario</span>
+          <select
+            id="custom-scenario-select"
+            value={selectedScenarioId}
+            onChange={(event) => onSelectScenario(event.target.value)}
+          >
+            {customScenarios.map((scenario) => (
+              <option key={scenario.id} value={scenario.id}>{scenario.title}</option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+
+      <div className="custom-form-grid">
+        <label className="custom-form-field">
+          <span>Scenario title</span>
+          <input
+            type="text"
+            value={draft.title}
+            onChange={(event) => updateField('title', event.target.value)}
+            placeholder="AI Tutor Deployment in Public Schools"
+          />
+        </label>
+        <label className="custom-form-field">
+          <span>Domain</span>
+          <input
+            type="text"
+            value={draft.domain}
+            onChange={(event) => updateField('domain', event.target.value)}
+            placeholder="education technology adoption"
+          />
+        </label>
+        <label className="custom-form-field span-2">
+          <span>Decision scenario</span>
+          <textarea
+            rows={5}
+            value={draft.context}
+            onChange={(event) => updateField('context', event.target.value)}
+            placeholder="Describe the deployment decision, the upside, the risks, and why people may resist adoption."
+          />
+        </label>
+        <label className="custom-form-field">
+          <span>Stakeholders</span>
+          <textarea
+            rows={3}
+            value={draft.stakeholders}
+            onChange={(event) => updateField('stakeholders', event.target.value)}
+            placeholder="students, teachers, parents"
+          />
+        </label>
+        <label className="custom-form-field">
+          <span>Tradeoffs</span>
+          <textarea
+            rows={3}
+            value={draft.tradeoffs}
+            onChange={(event) => updateField('tradeoffs', event.target.value)}
+            placeholder="learning outcomes, privacy, bias risk"
+          />
+        </label>
+        <label className="custom-form-field span-2">
+          <span>Motivational conflict notes</span>
+          <textarea
+            rows={3}
+            value={draft.conflictNotes}
+            onChange={(event) => updateField('conflictNotes', event.target.value)}
+            placeholder="Name the tension between progress, safety, care, and user choice."
+          />
+        </label>
+      </div>
+
+      <div className="custom-options-editor" aria-label="Candidate intervention options">
+        <p className="detail-subhead">Candidate intervention options</p>
+        {draft.decisionOptions.map((option, index) => (
+          <div className="custom-option-row" key={option.id}>
+            <span className="custom-option-letter">{String.fromCharCode(65 + index)}</span>
+            <label>
+              <span>Label</span>
+              <input
+                type="text"
+                value={option.label}
+                onChange={(event) => updateOption(index, 'label', event.target.value)}
+              />
+            </label>
+            <label>
+              <span>Description</span>
+              <textarea
+                rows={2}
+                value={option.description}
+                onChange={(event) => updateOption(index, 'description', event.target.value)}
+              />
+            </label>
+          </div>
+        ))}
+      </div>
+
+      <div className="custom-form-actions">
+        <button className="control-btn primary" type="submit" disabled={isSaving}>
+          {isSaving ? <Loader2 aria-hidden="true" className="spinner-icon" /> : <ClipboardList aria-hidden="true" />}
+          {isSaving ? 'Creating scenario...' : 'Create custom scenario'}
+        </button>
+        <button className="control-btn secondary" type="button" onClick={onLoadExample} disabled={isSaving}>
+          <RefreshCcw aria-hidden="true" />
+          Load AI tutor example
+        </button>
+      </div>
+      {error ? <p className="error-text" role="alert">{error}</p> : null}
+    </form>
   );
 }
 
@@ -363,7 +583,7 @@ function CanonicalBatteryCTA({ onRun, batteryState }) {
       <p className="panel-note">
         9 adoption cases × 4 profiles × 5 trials + 20-call same-profile baseline + 144 low-vs-high sensitivity contrasts (288 endpoint calls) + 9 moderator calls.
         Approximately <strong>~497 live OpenAI calls</strong>; budget before running and expect <strong>~10-20 min</strong> wall clock.
-        Idempotent - re-running with the same key resumes pending cells.
+        Idempotent - re-running with the same key resumes pending contrasts.
       </p>
       <button
         className="run-action"
@@ -649,7 +869,7 @@ function ThreeLayerPanel({ run, perAgent, onCompute, isComputing, error, onPickR
 }
 
 // ============================================================================
-// Boundary Map tab: 144-cell heatmap + job status bar
+// Boundary Map tab: low-vs-high contrast heatmap + job status bar
 // ============================================================================
 function BoundaryMapPanel({ heatmap, jobState, loading, onRefresh, onRunGrid, onRetryFailed, onRerunCell }) {
   const cellCount = Array.isArray(heatmap?.cells) ? heatmap.cells.length : 0;
@@ -670,12 +890,14 @@ function BoundaryMapPanel({ heatmap, jobState, loading, onRefresh, onRunGrid, on
   const hasNoGridData = !hasColoredCells;
   const progressPercent = Math.min(100, Math.round((completedCells / totalCells) * 100));
   const statusLabel = isGridFailed ? 'Error' : status === 'completed' ? 'Complete' : status === 'partial' ? 'Partial' : isGridRunning ? 'Running' : 'Ready';
+  const gridLabel = `${totalCells}-contrast`;
+  const endpointCallCount = totalCells * 2;
   return (
     <section className="panel" aria-labelledby="boundary-title">
       <div className="section-heading">
         <div>
           <span className="eyebrow">Sensitivity grid</span>
-          <h2 id="boundary-title">144-contrast axis-weight load-bearing heatmap</h2>
+          <h2 id="boundary-title">{gridLabel} axis-weight load-bearing heatmap</h2>
         </div>
         <Grid3x3 aria-hidden="true" />
       </div>
@@ -683,13 +905,13 @@ function BoundaryMapPanel({ heatmap, jobState, loading, onRefresh, onRunGrid, on
         <div className="job-status-bar">
           <span className="eyebrow">Job</span>
           <strong>
-            {statusLabel} · {completedCells}/{totalCells} cells
+            {statusLabel} · {completedCells}/{totalCells} contrasts
             {failedCells > 0 ? ` · ${failedCells} failed` : ''}
             {loading ? ' · checking status...' : ''}
           </strong>
           {canRetryFailedCells ? (
             <button type="button" className="control-btn primary compact" onClick={onRetryFailed} disabled={isGridRunning}>
-              {isRetryingFailedCells ? 'Retrying failed cells...' : 'Retry failed cells'}
+              {isRetryingFailedCells ? 'Retrying failed contrasts...' : 'Retry failed contrasts'}
             </button>
           ) : canResumeIncompleteGrid ? (
             <button type="button" className="control-btn primary compact" onClick={onRetryFailed} disabled={isGridRunning}>
@@ -709,9 +931,9 @@ function BoundaryMapPanel({ heatmap, jobState, loading, onRefresh, onRunGrid, on
           </button>
         </div>
         {(isGridRunning || isGridFailed) ? (
-          <div className="job-progress" role="progressbar" aria-valuemin="0" aria-valuemax={totalCells} aria-valuenow={completedCells} aria-label={`Processing ${completedCells} of ${totalCells} cells`}>
+          <div className="job-progress" role="progressbar" aria-valuemin="0" aria-valuemax={totalCells} aria-valuenow={completedCells} aria-label={`Processing ${completedCells} of ${totalCells} contrasts`}>
             <div className="job-progress-meta">
-              <span>{isRetryingFailedCells ? `Retrying failed cells; keeping ${completedCells} completed cells visible` : isGridFailed ? 'Grid stopped before completion' : `Processing ${completedCells} of ${totalCells} cells`}</span>
+              <span>{isRetryingFailedCells ? `Retrying failed contrasts; keeping ${completedCells} completed contrasts visible` : isGridFailed ? 'Grid stopped before completion' : `Processing ${completedCells} of ${totalCells} contrasts`}</span>
               <strong>{progressPercent}%</strong>
             </div>
             <div className="job-progress-track"><span style={{ width: `${progressPercent}%` }} /></div>
@@ -722,10 +944,10 @@ function BoundaryMapPanel({ heatmap, jobState, loading, onRefresh, onRunGrid, on
       {hasNoGridData ? (
         <div className="heatmap-empty-state" role="status">
           <strong>{isGridRunning ? 'Boundary Map is running' : 'No sensitivity contrasts yet'}</strong>
-          <p>{isGridRunning ? 'The 144-contrast grid has started. It runs 288 endpoint calls, and results appear as contrasts complete.' : 'Run the 144-contrast grid, then check status if the job was already started elsewhere.'}</p>
+          <p>{isGridRunning ? `The ${gridLabel} grid has started. It runs ${endpointCallCount} endpoint calls, and results appear as contrasts complete.` : `Run the ${gridLabel} grid, then check status if the job was already started elsewhere.`}</p>
           <div className="heatmap-empty-actions">
             {canRetryFailedCells ? (
-              <button type="button" className="control-btn primary compact" onClick={onRetryFailed} disabled={isGridRunning}>{isRetryingFailedCells ? 'Retrying failed cells...' : 'Retry failed cells'}</button>
+              <button type="button" className="control-btn primary compact" onClick={onRetryFailed} disabled={isGridRunning}>{isRetryingFailedCells ? 'Retrying failed contrasts...' : 'Retry failed contrasts'}</button>
             ) : canResumeIncompleteGrid ? (
               <button type="button" className="control-btn primary compact" onClick={onRetryFailed} disabled={isGridRunning}>Resume grid</button>
             ) : canCheckPartialJob ? (
@@ -761,7 +983,7 @@ function BoundaryMapPanel({ heatmap, jobState, loading, onRefresh, onRunGrid, on
             <p className="heatmap-explainer-hint">Click any cell for the low-vs-high intervention pair.</p>
           </>
         ) : (
-          <p className="heatmap-explainer-hint">Waiting for sensitivity contrasts. Progress can be checked above while the 144-contrast grid is pending.</p>
+          <p className="heatmap-explainer-hint">Waiting for sensitivity contrasts. Progress can be checked above while the {gridLabel} grid is pending.</p>
         )}
       </aside>
       {hasColoredCells ? (
@@ -873,11 +1095,13 @@ function MethodologyDetails() {
       </details>
 
       <details>
-        <summary>Sensitivity grid (144 contrasts, 288 endpoint calls)</summary>
+        <summary>Sensitivity grid</summary>
         <p>
           For each (adoption case × profile × axis), hold all non-target axes fixed, set the target axis
           to low (<code>0.2</code>) and high (<code>0.8</code>), and run one <code>{ACTIVE_MODEL}</code>
-          trial at each endpoint. A red cell means the low-vs-high contrast changed the recommended intervention.
+          trial at each endpoint. A single-case Boundary Map has 16 contrasts and 32 endpoint calls; the
+          canonical battery grid has 144 contrasts and 288 endpoint calls. A red cell means the low-vs-high
+          contrast changed the recommended intervention.
         </p>
       </details>
 
@@ -1130,7 +1354,12 @@ function DiagnosticsPanel() {
 // ============================================================================
 function App() {
   const [activeTab, setActiveTab] = useState('setup');
+  const [scenarioMode, setScenarioMode] = useState('canonical');
   const [selectedScenarioId, setSelectedScenarioId] = useState(defaultScenarioId);
+  const [customScenarios, setCustomScenarios] = useState([]);
+  const [customScenarioDraft, setCustomScenarioDraft] = useState(() => makeEmptyCustomScenarioDraft());
+  const [customScenarioSaving, setCustomScenarioSaving] = useState(false);
+  const [customScenarioError, setCustomScenarioError] = useState('');
 
   // Profile / weights state for the Setup compass
   const [profileWeights, setProfileWeights] = useState(profiles[1].weights); // Exploration
@@ -1164,9 +1393,21 @@ function App() {
   // Canonical battery state
   const [batteryState, setBatteryState] = useState(null);
 
+  const availableScenarios = useMemo(() => [...scenarios, ...customScenarios], [customScenarios]);
   const selectedScenario = useMemo(
-    () => scenarios.find((s) => s.id === selectedScenarioId) ?? scenarios[0],
-    [selectedScenarioId],
+    () => availableScenarios.find((s) => s.id === selectedScenarioId) ?? scenarios[0],
+    [availableScenarios, selectedScenarioId],
+  );
+  const selectedScenarioIsRunnable = scenarioMode === 'canonical' || selectedScenario?.kind === 'custom';
+  const buildHeatmapScenarioRows = (scenarioIds) => (
+    scenarioIds.map((scenarioId) => {
+      const scenario = availableScenarios.find((item) => item.id === scenarioId);
+      return {
+        id: scenarioId,
+        title: scenario?.title ?? scenarioId,
+        group: scenario?.kind === 'custom' ? 'Custom scenario' : (scenario?.group ?? null),
+      };
+    })
   );
 
   // 5-trial aggregation feed for AgentLane: group ALL outputs by profileId,
@@ -1230,12 +1471,76 @@ function App() {
     setProfileWeights(preset.weights);
     setActivePresetId(preset.id);
   };
+  const onScenarioModeChange = (nextMode) => {
+    setScenarioMode(nextMode);
+    setCustomScenarioError('');
+    if (nextMode === 'canonical') {
+      if (selectedScenario?.kind === 'custom') setSelectedScenarioId(defaultScenarioId);
+    } else if (customScenarios.length > 0) {
+      setSelectedScenarioId(customScenarios[0].id);
+    }
+  };
+  const loadCustomScenarioExample = () => {
+    setCustomScenarioDraft({
+      ...customScenarioExample,
+      decisionOptions: customScenarioExample.decisionOptions.map((option) => ({ ...option })),
+    });
+    setCustomScenarioError('');
+  };
+  const createCustomScenarioFromDraft = async (event) => {
+    event.preventDefault();
+    setCustomScenarioSaving(true);
+    setCustomScenarioError('');
+    try {
+      const payload = {
+        title: customScenarioDraft.title.trim(),
+        domain: customScenarioDraft.domain.trim(),
+        context: customScenarioDraft.context.trim(),
+        stakeholders: splitListInput(customScenarioDraft.stakeholders),
+        tradeoffs: splitListInput(customScenarioDraft.tradeoffs),
+        conflictNotes: customScenarioDraft.conflictNotes.trim(),
+        decisionOptions: customScenarioDraft.decisionOptions.map((option) => ({
+          id: option.id,
+          label: option.label.trim(),
+          description: option.description.trim(),
+        })),
+      };
+      const incompleteOption = payload.decisionOptions.find((option) => !option.label || !option.description);
+      if (!payload.title || !payload.domain || payload.context.length < 20 || !payload.conflictNotes || incompleteOption) {
+        throw new Error('Complete the title, domain, scenario, conflict notes, and all four intervention options.');
+      }
+      if (payload.stakeholders.length === 0 || payload.tradeoffs.length === 0) {
+        throw new Error('Add at least one stakeholder and one tradeoff.');
+      }
+      const response = await fetch('/api/scenarios/custom', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw data || new Error('Custom scenario API unavailable');
+      const nextScenario = enrichCustomScenario(data.scenario);
+      setCustomScenarios((prev) => [nextScenario, ...prev.filter((scenario) => scenario.id !== nextScenario.id)]);
+      setSelectedScenarioId(nextScenario.id);
+      setScenarioMode('custom');
+    } catch (err) {
+      setCustomScenarioError(getProblemMessage(err, 'Custom scenario API unavailable.'));
+    } finally {
+      setCustomScenarioSaving(false);
+    }
+  };
 
   // ---- Run experiment (single adoption case, all 4 profiles, 5 trials) ----
   const runExperiment = async () => {
     setActiveTab('run');
     setIsRunning(true);
     setRunError('');
+    if (!selectedScenarioIsRunnable) {
+      setRunMode('Ready');
+      setRunError('Create a custom scenario first, or switch back to a canonical case.');
+      setIsRunning(false);
+      return;
+    }
     setRunMode(`Calling 4 agents x 5 trials via ${ACTIVE_MODEL}...`);
     setPerAgent(null);
     setPerAgentRunId(null);
@@ -1435,14 +1740,23 @@ function App() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw data || new Error('Grid job status unavailable');
       setGridJob({ ...data });
-      // Update heatmap cells inline from job results when available.
+      // Update heatmap contrasts inline from job results when available.
       if (Array.isArray(data.results)) {
         setHeatmap((prev) => ({
-          scenarios: prev?.scenarios ?? scenarios,
-          profiles: prev?.profiles ?? profiles.map((p) => ({ id: p.id, name: p.name })),
-          axes: prev?.axes ?? axes,
+          scenarios: Array.isArray(data.scenarioIds) ? buildHeatmapScenarioRows(data.scenarioIds) : (prev?.scenarios ?? scenarios),
+          profiles: Array.isArray(data.profileIds)
+            ? data.profileIds.map((profileId) => ({ id: profileId, name: profileNameById[profileId] ?? profileId }))
+            : (prev?.profiles ?? profiles.map((p) => ({ id: p.id, name: p.name }))),
+          axes: Array.isArray(data.axisIds)
+            ? data.axisIds.map((axisId) => axes.find((axis) => axis.id === axisId) ?? { id: axisId, label: axisId })
+            : (prev?.axes ?? axes),
           cells: data.results,
           generatedAt: Math.floor(Date.now() / 1000),
+          jobId: data.jobId ?? jobId,
+          status: data.status,
+          completedCells: data.completedCells,
+          failedCells: data.failedCells,
+          totalCells: data.totalCells,
         }));
       }
     } catch (err) {
@@ -1492,18 +1806,32 @@ function App() {
   };
 
   const startSensitivityGrid = async () => {
+    const scenarioIds = [selectedScenario.id];
+    const expectedTotalCells = profiles.length * axes.length;
     setHeatmapLoading(true);
-    setGridJob((prev) => ({ ...(prev ?? {}), status: 'pending', error: null, completedCells: prev?.completedCells ?? 0, totalCells: prev?.totalCells ?? 144 }));
+    setGridJob((prev) => ({ ...(prev ?? {}), status: 'pending', error: null, completedCells: 0, totalCells: expectedTotalCells }));
+    setHeatmap({
+      scenarios: buildHeatmapScenarioRows(scenarioIds),
+      profiles: profiles.map((p) => ({ id: p.id, name: p.name })),
+      axes,
+      cells: [],
+      generatedAt: Math.floor(Date.now() / 1000),
+      totalCells: expectedTotalCells,
+    });
     try {
       const idempotencyKey = newIdempotencyKey('grid');
       const response = await fetch('/api/sensitivity-grid', {
         method: 'POST',
         headers: authHeaders({ 'idempotency-key': idempotencyKey }),
-        body: JSON.stringify({ idempotencyKey }),
+        body: JSON.stringify({
+          idempotencyKey,
+          scenarioIds,
+          errorBudget: 4,
+        }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw data || new Error('Grid job unavailable');
-      setGridJob({ ...data, status: data.status ?? 'pending', completedCells: data.completedCells ?? 0, totalCells: data.totalCells ?? 144 });
+      setGridJob({ ...data, status: data.status ?? 'pending', completedCells: data.completedCells ?? 0, totalCells: data.totalCells ?? expectedTotalCells });
       if (data.jobId) refreshGridJob(data.jobId);
     } catch (err) {
       setGridJob((prev) => ({ ...(prev ?? {}), status: 'failed', error: getProblemMessage(err, 'Grid job unavailable.') }));
@@ -1576,14 +1904,44 @@ function App() {
       body: (
         <section className="panel setup-pick" aria-labelledby="setup-pick-title">
           <div className="section-heading">
-            <div><span className="eyebrow">Adoption case</span><h2 id="setup-pick-title">Choose from 9 canonical adoption cases in 3 groups</h2></div>
+            <div><span className="eyebrow">Adoption case</span><h2 id="setup-pick-title">Choose a benchmark case or write your own</h2></div>
             <Microscope aria-hidden="true" />
           </div>
-          <ScenarioGroupedDropdown value={selectedScenarioId} onChange={setSelectedScenarioId} />
-          <p className="panel-note">
-            <strong>{selectedScenario.title}</strong> - {selectedScenario.group} · adoption blocker: {selectedScenario.conflict}
-          </p>
-          <ScenarioDetailPanel scenario={selectedScenario} />
+          <ScenarioModeToggle mode={scenarioMode} onChange={onScenarioModeChange} />
+          {scenarioMode === 'canonical' ? (
+            <>
+              <ScenarioGroupedDropdown value={selectedScenarioId} onChange={setSelectedScenarioId} items={scenarios} />
+              <p className="panel-note">
+                <strong>{selectedScenario.title}</strong> - {selectedScenario.group} · adoption blocker: {selectedScenario.conflict}
+              </p>
+              <ScenarioDetailPanel scenario={selectedScenario} />
+            </>
+          ) : (
+            <>
+              <p className="panel-note">
+                Custom scenarios run through the same 4 motivational agents. The 9 canonical cases remain the fixed evaluation benchmark.
+              </p>
+              <CustomScenarioComposer
+                draft={customScenarioDraft}
+                onDraftChange={setCustomScenarioDraft}
+                onSubmit={createCustomScenarioFromDraft}
+                onLoadExample={loadCustomScenarioExample}
+                isSaving={customScenarioSaving}
+                error={customScenarioError}
+                customScenarios={customScenarios}
+                selectedScenarioId={selectedScenarioId}
+                onSelectScenario={setSelectedScenarioId}
+              />
+              {selectedScenario?.kind === 'custom' ? (
+                <div className="custom-scenario-preview">
+                  <p className="panel-note">
+                    Active custom scenario: <strong>{selectedScenario.title}</strong> · {selectedScenario.domain}
+                  </p>
+                  <ScenarioDetailPanel scenario={selectedScenario} />
+                </div>
+              ) : null}
+            </>
+          )}
         </section>
       ),
     },
@@ -1615,9 +1973,9 @@ function App() {
               <div><span className="eyebrow">Single run</span><h2 id="single-run-title">Run this adoption case × 4 profiles × 5 trials</h2></div>
             </div>
             <p className="panel-note">20 calls to <code>{ACTIVE_MODEL}</code>. Identical model and generation settings; only the motivation-weight prompt differs.</p>
-            <button className="run-action" type="button" onClick={runExperiment} disabled={isRunning}>
+            <button className="run-action" type="button" onClick={runExperiment} disabled={isRunning || !selectedScenarioIsRunnable}>
               {isRunning ? <Loader2 aria-hidden="true" className="spinner-icon" /> : <Play aria-hidden="true" />}
-              {isRunning ? 'Running...' : `Run ${selectedScenario.title}`}
+              {isRunning ? 'Running...' : selectedScenarioIsRunnable ? `Run ${selectedScenario.title}` : 'Create custom scenario first'}
             </button>
             {runError ? <p className="error-text" role="alert">{runError}</p> : null}
           </section>
@@ -1719,7 +2077,7 @@ function App() {
   const boundarySteps = [
     {
       n: 1,
-      title: 'Inspect the 144-contrast heatmap',
+      title: 'Inspect the single-case heatmap',
       body: (
         <BoundaryMapPanel
           heatmap={heatmap}

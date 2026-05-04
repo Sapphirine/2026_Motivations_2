@@ -1624,6 +1624,35 @@ h3 {
 }
 
 /* Scenario grouped dropdown (Setup tab 1) */
+.scenario-mode-toggle {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  width: min(420px, 100%);
+  border: 1px solid #d8d2c8;
+  border-radius: 14px;
+  padding: 4px;
+  background: #fffcf6;
+}
+
+.scenario-mode-toggle button {
+  cursor: pointer;
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 12px;
+  background: transparent;
+  color: #5f646d;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.scenario-mode-toggle button.is-active {
+  background: #232323;
+  color: #fffcf6;
+  box-shadow: 0 8px 18px rgba(35, 35, 35, 0.12);
+}
+
 .scenario-dropdown {
   display: grid;
   gap: 6px;
@@ -1717,10 +1746,112 @@ h3 {
   line-height: 1.45;
 }
 
+.custom-scenario-form {
+  display: grid;
+  gap: 16px;
+  border-top: 1px solid #ece9e1;
+  padding-top: 14px;
+}
+
+.custom-existing-select {
+  margin-top: 0;
+}
+
+.custom-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.custom-form-field,
+.custom-option-row label {
+  display: grid;
+  gap: 6px;
+  color: #232323;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.custom-form-field.span-2 {
+  grid-column: 1 / -1;
+}
+
+.custom-form-field input,
+.custom-form-field textarea,
+.custom-option-row input,
+.custom-option-row textarea {
+  width: 100%;
+  border: 1px solid #d8d2c8;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #fffcf6;
+  color: #232323;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.custom-form-field textarea,
+.custom-option-row textarea {
+  resize: vertical;
+}
+
+.custom-form-field input:focus-visible,
+.custom-form-field textarea:focus-visible,
+.custom-option-row input:focus-visible,
+.custom-option-row textarea:focus-visible {
+  outline: 3px solid rgba(91, 92, 226, 0.35);
+  outline-offset: 2px;
+}
+
+.custom-options-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.custom-option-row {
+  display: grid;
+  grid-template-columns: 34px minmax(160px, 0.5fr) minmax(260px, 1fr);
+  gap: 10px;
+  align-items: start;
+  border: 1px solid #d8d2c8;
+  border-radius: 12px;
+  padding: 10px;
+  background: #fffcf6;
+}
+
+.custom-option-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #232323;
+  color: #fffcf6;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.custom-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.custom-scenario-preview {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid #ece9e1;
+  padding-top: 14px;
+}
+
 @media (max-width: 780px) {
   .scenario-detail-grid,
   .intervention-option-list,
-  .stakeholder-list.compact {
+  .stakeholder-list.compact,
+  .custom-form-grid,
+  .custom-option-row {
     grid-template-columns: 1fr;
   }
 }

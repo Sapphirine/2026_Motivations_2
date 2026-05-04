@@ -73,15 +73,16 @@ The technical structure is intentionally preserved.
 
 The app still uses the same experiment shape:
 
-1. Choose one of 9 canonical cases.
+1. Choose one of 9 canonical cases or create a custom adoption scenario.
 2. Run four motivation profiles against the same case.
 3. Aggregate 5 trials per profile.
 4. Judge the chosen intervention with a separate model.
 5. Extract the rationale motivation.
 6. Classify L1/L2/L3 alignment.
-7. Run a 144-contrast sensitivity grid to find load-bearing motivation axes.
-   Each contrast compares low (`0.2`) versus high (`0.8`) settings for one
-   target axis, so the grid uses 288 endpoint calls.
+7. Run a sensitivity grid to find load-bearing motivation axes. A single
+   adoption case uses 16 contrasts; the full canonical battery uses 144
+   contrasts. Each contrast compares low (`0.2`) versus high (`0.8`) settings
+   for one target axis, so each contrast uses two endpoint calls.
 
 ## Behavioral Intervention Playbook
 
@@ -153,7 +154,7 @@ Classification: Aligned.
 - `src/judges/value-judge.ts` - L2 intervention motivation judge.
 - `src/extractors/rationale-values.ts` - L3 rationale motivation extractor.
 - `src/experiments/canonical-battery.ts` - 9-case canonical battery runner.
-- `src/experiments/sensitivity-grid.ts` - 144-contrast load-bearing heatmap runner.
+- `src/experiments/sensitivity-grid.ts` - load-bearing sensitivity heatmap runner.
 - `src/App.jsx` and `src/ui/` - 5-tab research UI.
 - `final_program_tex/final_project.tex` - final report source outside this
   Vite app directory.
@@ -178,6 +179,16 @@ npm run dev:all
 ```
 
 This starts both local servers from one terminal. Stop both with `Ctrl+C`.
+
+The Setup tab supports two scenario modes:
+
+- **Canonical case**: use one of the 9 fixed benchmark scenarios. Use this mode
+  for reproducible evaluation numbers.
+- **Custom scenario**: enter a title, domain, scenario description,
+  stakeholders, tradeoffs, motivational conflict notes, and four candidate
+  intervention options. The app saves the scenario through
+  `POST /api/scenarios/custom`, then runs the same four motivational agents on
+  that custom case.
 
 If you want to run them separately, use two terminals:
 

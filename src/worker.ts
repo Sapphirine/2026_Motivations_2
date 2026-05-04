@@ -441,6 +441,9 @@ app.post('/api/sensitivity-grid', rateLimit('sensitivity-grid'), async (c) => {
   return c.json({
     jobId: start.job.id,
     totalCells: start.job.totalCells,
+    scenarioIds: start.job.scenarioIds,
+    profileIds: start.job.profileIds,
+    axisIds: start.job.axisIds,
     status: start.job.status,
     alreadyExisted: start.alreadyExisted,
   }, 202);
@@ -514,6 +517,9 @@ app.get('/api/sensitivity-grid/:jobId', async (c) => {
     completedCells: job.completedCells,
     failedCells: job.failedCells,
     errorBudget: job.errorBudget,
+    scenarioIds: job.scenarioIds,
+    profileIds: job.profileIds,
+    axisIds: job.axisIds,
     results: job.results,
     errors: job.errors,
   });
