@@ -143,6 +143,7 @@ export default function AgentLane({ profile, outputs, status, alignmentPattern, 
     ? safeOutputs.find((o) => pickedKey(o) === agg.modal)
     : null;
   const representativeRationale = representativeTrial?.structuredDecision?.rationale ?? null;
+  const policyCompliance = representativeTrial?.structuredDecision?.policyCompliance ?? null;
 
   return (
     <article className={`agent-lane lane-${meta.cls}`}>
@@ -249,6 +250,17 @@ export default function AgentLane({ profile, outputs, status, alignmentPattern, 
                 Representative trial · #{(representativeTrial.trialIndex ?? 0) + 1}
               </span>
               <p>{representativeRationale}</p>
+            </div>
+          ) : null}
+
+          {policyCompliance ? (
+            <div className="lane-detail-block">
+              <span className="eyebrow">Policy compliance check</span>
+              <p>
+                Status: <strong>{policyCompliance.status}</strong>
+                {policyCompliance.coveredRiskTypes?.length ? ` · covered: ${policyCompliance.coveredRiskTypes.join(', ')}` : ''}
+                {policyCompliance.missingRiskTypes?.length ? ` · review: ${policyCompliance.missingRiskTypes.join(', ')}` : ''}
+              </p>
             </div>
           ) : null}
 

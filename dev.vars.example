@@ -9,6 +9,8 @@ RUN_RATE_LIMIT_WINDOW_SECONDS=3600
 ARTIFACT_MAX_BYTES=500000
 ARTIFACT_RETENTION_DAYS=14
 DEMO_MODE=true
+POLICY_RAG_ENABLED=true
+POLICY_RAG_ORIGIN=http://127.0.0.1:8010
 
 # Local live OpenAI/evaluation secret. Copy this file to .dev.vars, set
 # DEMO_MODE=false, and fill this value. .dev.vars is gitignored.

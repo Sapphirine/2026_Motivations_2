@@ -15,6 +15,12 @@ behavioral intervention policy, recommends a small motivationally aligned
 micro-action, and audits whether its own recommendation matches the intended
 motivation frame.
 
+The optional local Policy-Grounding RAG sidecar adds a second grounding layer:
+before the motivation agents respond, MotiveOps detects the domain and risk
+surface for the scenario, retrieves responsible-AI policy constraints from a
+local Chroma vector store, and asks the agents to generate interventions that
+remain compatible with those constraints.
+
 ## Why this pivot
 
 Enterprise AI spend is already large, but business value is uneven:
@@ -105,6 +111,41 @@ The prompt receives the top matching policies, then returns the same structured
 JSON contract used by the original app. That keeps backend changes small while
 changing the product meaning.
 
+## Policy-Grounding RAG
+
+The newer RAG layer is separate from the intervention playbook. Its job is not
+to recommend the motivational strategy. Its job is to make the recommendation
+deployable in a real organization.
+
+Pipeline:
+
+```text
+Scenario
+-> risk / domain detection
+-> local Chroma policy retrieval
+-> motivation profile agents
+-> constraint-aware intervention generation
+-> L1/L2/L3 motivation alignment audit
+-> lightweight policy compliance check
+-> boundary / sensitivity map
+```
+
+The curated corpus lives in `rag_corpus/policy_chunks.json`. It summarizes the
+local documents in `doc/` into short retrievable constraints covering:
+
+- Responsible-AI governance: NIST AI RMF, NIST GenAI Profile, Microsoft RAI.
+- Privacy/security: NIST Privacy Framework, NIST CSF, OpenAI usage policies.
+- Education: FERPA, PPRA, student privacy, UNESCO education AI guidance.
+- Workplace adoption: Department of Labor AI guidance and worker well-being.
+- HR/employment: EEOC selection-procedure guidance.
+- Legal operations: ABA Formal Opinion 512.
+- Finance/model accountability: Federal Reserve/OCC model-risk guidance.
+- Customer/marketing/support: FTC privacy, deceptive AI claims, and AI screening cases.
+
+The sidecar runs locally on `http://127.0.0.1:8010`. The Worker calls it through
+`POST /api/rag/policy`. If the sidecar is not running, the app still works and
+falls back to the detected risk context plus the existing intervention playbook.
+
 ## Example demo
 
 Input:
@@ -149,6 +190,8 @@ Classification: Aligned.
 
 - `src/domain/seeds.ts` - 9 AI workflow adoption cases and 4 motivation profiles.
 - `src/domain/intervention-playbook.ts` - heuristic playbook retrieval layer.
+- `src/services/policy-rag.ts` - risk detection, policy-RAG client, and
+  lightweight policy compliance check.
 - `src/services/prompts.ts` - MotiveOps prompt translation.
 - `src/services/provider.ts` - OpenAI/mock provider and moderator commentary.
 - `src/judges/value-judge.ts` - L2 intervention motivation judge.
@@ -156,6 +199,8 @@ Classification: Aligned.
 - `src/experiments/canonical-battery.ts` - 9-case canonical battery runner.
 - `src/experiments/sensitivity-grid.ts` - load-bearing sensitivity heatmap runner.
 - `src/App.jsx` and `src/ui/` - 5-tab research UI.
+- `rag_corpus/policy_chunks.json` - curated policy-grounding chunks.
+- `rag_server/policy_rag_server.py` - local Chroma policy-RAG sidecar.
 - `final_program_tex/final_project.tex` - final report source outside this
   Vite app directory.
 
@@ -179,6 +224,31 @@ npm run dev:all
 ```
 
 This starts both local servers from one terminal. Stop both with `Ctrl+C`.
+
+To include the local Chroma policy-RAG sidecar in the demo, install the Python
+dependency once and run the RAG service with the frontend and Worker:
+
+```bash
+npm run rag:install
+npm run dev:rag
+```
+
+`npm run dev:rag` starts three local processes:
+
+- frontend: `http://localhost:5173`
+- Worker backend: `http://localhost:8787`
+- policy-RAG sidecar: `http://127.0.0.1:8010`
+
+For separate terminals:
+
+```bash
+npm run rag:policy
+npm run dev:worker
+npm run dev
+```
+
+The Setup tab will show risk/domain detection and retrieved policy constraints
+when the sidecar is available.
 
 The Setup tab supports two scenario modes:
 
@@ -313,6 +383,7 @@ intervention choices.
 - `GET /api/scenarios/:id`
 - `POST /api/scenarios/custom`
 - `GET /api/value-profiles`
+- `POST /api/rag/policy`
 - `POST /api/experiments/run`
 - `POST /api/research/run-canonical-battery`
 - `GET /api/research/canonical-evidence`
@@ -364,6 +435,9 @@ It should prove that MotiveOps is doing adoption-specific work:
   `microAction`, `ifThenPlan`, `accountabilityScript`, and `successMetric`.
   The live local canonical summary reports complete-output rate `180/180 =
   1.00`.
+- **Policy-grounding coverage**: for each run, the Worker records detected risk
+  types, retrieved policy chunks, and a lightweight coverage check showing which
+  risk types were reflected in the generated intervention text.
 - **Canonical sensitivity battery**: `npm run eval:local` reports subject
   completion, profile-cell modal stability, profile divergence, three-layer
   audit coverage, same-profile baseline stability, and the 144-contrast endpoint

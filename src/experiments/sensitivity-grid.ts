@@ -29,6 +29,7 @@ import type {
 } from '../domain/types';
 import { getConfig } from '../services/config';
 import { computeBaselineModal } from '../services/experiment';
+import { attachPolicyCompliance, retrievePolicyGrounding } from '../services/policy-rag';
 import { runProfileProvider } from '../services/provider';
 import {
   getScenario,
@@ -307,22 +308,25 @@ async function processOneCell(
   let lowCellRunId = '';
   let highCellRunId = '';
   const config = getConfig(env);
+  const policyGrounding = await retrievePolicyGrounding(env, scenario);
 
   try {
     const lowResult = await withBudget(
-      runProfileProvider(env, env.OPENAI_MODEL ?? 'gpt-5.4-nano', config.generationSettings, scenario, lowProfile, userKey),
+      runProfileProvider(env, env.OPENAI_MODEL ?? 'gpt-5.4-nano', config.generationSettings, scenario, lowProfile, userKey, policyGrounding),
       PER_CELL_TIMEOUT_MS,
     );
-    lowOption = lowResult.structuredDecision.selectedOptionId;
-    lowRationale = lowResult.structuredDecision.rationale ?? '';
+    const lowDecision = attachPolicyCompliance(lowResult.structuredDecision, policyGrounding);
+    lowOption = lowDecision.selectedOptionId;
+    lowRationale = lowDecision.rationale ?? '';
     lowCellRunId = makeId('celllow');
 
     const highResult = await withBudget(
-      runProfileProvider(env, env.OPENAI_MODEL ?? 'gpt-5.4-nano', config.generationSettings, scenario, highProfile, userKey),
+      runProfileProvider(env, env.OPENAI_MODEL ?? 'gpt-5.4-nano', config.generationSettings, scenario, highProfile, userKey, policyGrounding),
       PER_CELL_TIMEOUT_MS,
     );
-    highOption = highResult.structuredDecision.selectedOptionId;
-    highRationale = highResult.structuredDecision.rationale ?? '';
+    const highDecision = attachPolicyCompliance(highResult.structuredDecision, policyGrounding);
+    highOption = highDecision.selectedOptionId;
+    highRationale = highDecision.rationale ?? '';
     highCellRunId = makeId('cellhigh');
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

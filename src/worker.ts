@@ -36,6 +36,7 @@ import {
   updateGridJob,
 } from './services/storage';
 import { getConfig } from './services/config';
+import { retrievePolicyGrounding } from './services/policy-rag';
 import { runThreeLayerAnalysis } from './analysis/three-layer-runner';
 import { runGridBatches, startSensitivityGridJob } from './experiments/sensitivity-grid';
 import { startCanonicalBattery } from './experiments/canonical-battery';
@@ -99,6 +100,7 @@ app.get('/', (c) => c.json({
     '/api/diagnostics',
     '/api/scenarios',
     '/api/value-profiles',
+    '/api/rag/policy',
   ],
 }));
 
@@ -177,6 +179,8 @@ app.get('/api/diagnostics', async (c) => {
       llmModeratorEnabled: true,
       threeLayerEnabled: true,
       sensitivityGridEnabled: true,
+      policyGroundingRagEnabled: (c.env.POLICY_RAG_ENABLED ?? 'true') !== 'false',
+      policyRagOrigin: c.env.POLICY_RAG_ORIGIN ?? 'http://127.0.0.1:8010',
       userKeyAcceptHeader: 'X-OpenAI-Key',
     },
   });
@@ -207,6 +211,17 @@ app.post('/api/scenarios/custom', rateLimit('scenarios-custom'), async (c) => {
 });
 
 app.get('/api/value-profiles', (c) => c.json({ profiles: listProfiles() }));
+
+app.post('/api/rag/policy', rateLimit('rag-policy'), async (c) => {
+  const parsed = z.object({
+    scenarioId: z.string().min(1),
+    topK: z.number().int().min(1).max(8).optional(),
+  }).safeParse(await c.req.json());
+  if (!parsed.success) return c.json(validationProblem(parsed.error, c.req.path), 400);
+  const scenario = getScenario(parsed.data.scenarioId);
+  if (!scenario) return c.json(problem(404, 'Scenario not found', 'The requested scenario does not exist.', c.req.path), 404);
+  return c.json({ result: await retrievePolicyGrounding(c.env, scenario, { topK: parsed.data.topK }) });
+});
 
 app.post('/api/questions/answer', rateLimit('questions-answer'), async (c) => {
   const parsed = questionSchema.safeParse(await c.req.json());

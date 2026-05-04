@@ -36,6 +36,7 @@ import {
   AlertTriangle,
   BarChart3,
   ClipboardList,
+  Database,
   FileText,
   Grid3x3,
   KeyRound,
@@ -45,6 +46,7 @@ import {
   Microscope,
   Play,
   RefreshCcw,
+  ShieldCheck,
   Wrench,
 } from 'lucide-react';
 import AgentWorkflowDiagram from './ui/AgentWorkflowDiagram.jsx';
@@ -372,6 +374,61 @@ function ScenarioDetailPanel({ scenario }) {
       </div>
       <p className="dim-note scenario-conflict-note">{scenario.conflictNotes}</p>
     </div>
+  );
+}
+
+function PolicyGroundingPanel({ grounding, loading, error, onRefresh }) {
+  const riskContext = grounding?.riskContext;
+  const chunks = Array.isArray(grounding?.chunks) ? grounding.chunks : [];
+  const enabled = Boolean(grounding?.enabled && chunks.length > 0);
+
+  return (
+    <section className="policy-grounding-panel" aria-labelledby="policy-grounding-title">
+      <div className="policy-grounding-head">
+        <div>
+          <span className="eyebrow">Risk / domain detection</span>
+          <h3 id="policy-grounding-title">Policy grounding</h3>
+        </div>
+        <button type="button" className="control-btn secondary compact" onClick={onRefresh} disabled={loading}>
+          {loading ? <Loader2 aria-hidden="true" className="spinner-icon" /> : <RefreshCcw aria-hidden="true" />}
+          {loading ? 'Checking...' : 'Refresh'}
+        </button>
+      </div>
+      {riskContext ? (
+        <div className="policy-context-grid">
+          <div><span>Domain</span><strong>{riskContext.domain}</strong></div>
+          <div><span>Stage</span><strong>{riskContext.deploymentStage}</strong></div>
+          <div><span>Stakeholders</span><strong>{riskContext.affectedStakeholders?.slice(0, 4).join(', ') || 'unspecified'}</strong></div>
+        </div>
+      ) : null}
+      {riskContext?.riskTypes?.length ? (
+        <div className="tag-row policy-risk-tags" aria-label="Detected risk types">
+          {riskContext.riskTypes.map((risk) => <span key={risk}>{risk}</span>)}
+        </div>
+      ) : null}
+      {error ? <p className="error-text" role="alert">{error}</p> : null}
+      {!error && grounding?.warning ? <p className="panel-note dim-note">{grounding.warning}</p> : null}
+      {enabled ? (
+        <ol className="policy-chunk-list">
+          {chunks.map((chunk) => (
+            <li key={chunk.id}>
+              <div className="policy-chunk-title">
+                <ShieldCheck aria-hidden="true" />
+                <strong>{chunk.title}</strong>
+                {Number.isFinite(chunk.score) ? <span>{Math.round(chunk.score * 100)}%</span> : null}
+              </div>
+              <p>{chunk.text}</p>
+              <small>{chunk.source} · {chunk.riskTypes?.slice(0, 3).join(', ')}</small>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <div className="policy-empty-state">
+          <Database aria-hidden="true" />
+          <p>Start the local Chroma sidecar with <code>npm run rag:policy</code> to retrieve policy constraints.</p>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -1086,6 +1143,16 @@ function MethodologyDetails() {
       </details>
 
       <details>
+        <summary>Policy-Grounding RAG</summary>
+        <p>
+          The Worker first detects domain, affected stakeholders, risk types, and deployment stage from the adoption case.
+          When the local Chroma sidecar is running, <code>/api/rag/policy</code> retrieves responsible-AI and domain-policy
+          constraints from <code>rag_corpus/policy_chunks.json</code>. The same constraints are injected into the motivation
+          profile prompts before intervention generation, then each output receives a lightweight policy coverage check.
+        </p>
+      </details>
+
+      <details>
         <summary>Three-Layer pipeline (L1 / L2 / L3)</summary>
         <ul>
           <li><strong>L1 Declared</strong>: top-2 axes from the motivation-profile snapshot. Deterministic, no LLM.</li>
@@ -1389,6 +1456,10 @@ function App() {
   const [gridJob, setGridJob] = useState(null); // { jobId, status, completedCells, totalCells, ... }
   const [heatmap, setHeatmap] = useState(null);
   const [heatmapLoading, setHeatmapLoading] = useState(false);
+  const [policyGrounding, setPolicyGrounding] = useState(null);
+  const [policyGroundingLoading, setPolicyGroundingLoading] = useState(false);
+  const [policyGroundingError, setPolicyGroundingError] = useState('');
+  const policyGroundingRequestSeq = useRef(0);
 
   // Canonical battery state
   const [batteryState, setBatteryState] = useState(null);
@@ -1409,6 +1480,41 @@ function App() {
       };
     })
   );
+
+  const refreshPolicyGrounding = async () => {
+    if (!selectedScenario?.id) return;
+    const requestId = policyGroundingRequestSeq.current + 1;
+    policyGroundingRequestSeq.current = requestId;
+    setPolicyGroundingLoading(true);
+    setPolicyGroundingError('');
+    try {
+      const response = await fetch('/api/rag/policy', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ scenarioId: selectedScenario.id, topK: 5 }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw data || new Error('Policy RAG unavailable');
+      if (policyGroundingRequestSeq.current === requestId) {
+        setPolicyGrounding(data.result ?? null);
+      }
+    } catch (error) {
+      if (policyGroundingRequestSeq.current === requestId) {
+        setPolicyGroundingError(getProblemMessage(error, 'Policy RAG unavailable.'));
+        setPolicyGrounding(null);
+      }
+    } finally {
+      if (policyGroundingRequestSeq.current === requestId) {
+        setPolicyGroundingLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    setPolicyGrounding(null);
+    setPolicyGroundingError('');
+    refreshPolicyGrounding();
+  }, [selectedScenario?.id, selectedScenario?.updatedAt]);
 
   // 5-trial aggregation feed for AgentLane: group ALL outputs by profileId,
   // sort by trialIndex ascending. Each value is an array of agent_outputs rows
@@ -1561,6 +1667,7 @@ function App() {
       const nextRunId = data.runId ?? nextRun?.id;
       if (nextRun && (nextRunId || nextRun.status)) {
         setCurrentRun(nextRunId ? { ...nextRun, id: nextRunId } : nextRun);
+        if (nextRun.policyGrounding) setPolicyGrounding(nextRun.policyGrounding);
       }
       if (nextRunId) {
         const stringRunId = String(nextRunId);
@@ -1915,6 +2022,12 @@ function App() {
                 <strong>{selectedScenario.title}</strong> - {selectedScenario.group} · adoption blocker: {selectedScenario.conflict}
               </p>
               <ScenarioDetailPanel scenario={selectedScenario} />
+              <PolicyGroundingPanel
+                grounding={policyGrounding}
+                loading={policyGroundingLoading}
+                error={policyGroundingError}
+                onRefresh={refreshPolicyGrounding}
+              />
             </>
           ) : (
             <>
@@ -1938,6 +2051,12 @@ function App() {
                     Active custom scenario: <strong>{selectedScenario.title}</strong> · {selectedScenario.domain}
                   </p>
                   <ScenarioDetailPanel scenario={selectedScenario} />
+                  <PolicyGroundingPanel
+                    grounding={policyGrounding}
+                    loading={policyGroundingLoading}
+                    error={policyGroundingError}
+                    onRefresh={refreshPolicyGrounding}
+                  />
                 </div>
               ) : null}
             </>
@@ -2111,13 +2230,27 @@ function App() {
   const methodSteps = [
     { n: 1, title: 'Purpose at a glance',  body: <PurposeCallout /> },
     { n: 2, title: 'Canonical cases',       body: <CanonicalScenarioMatrix /> },
-    { n: 3, title: 'Methodology',           body: <MethodologyDetails /> },
-    { n: 4, title: 'Local evaluation summary', body: <LocalEvaluationPanel /> },
-    { n: 5, title: 'Q&A',                   body: <QAWidget selectedScenario={selectedScenario} currentRun={currentRun} /> },
-    { n: 6, title: 'Artifacts',             body: <ArtifactLinks run={currentRun} /> },
-    { n: 7, title: 'Run history',           body: <EvidenceLedger refreshKey={currentRun?.id ?? 'none'} /> },
-    { n: 8, title: 'Settings · OpenAI key', body: <UserKeySettings /> },
-    { n: 9, title: 'Diagnostics',           body: <DiagnosticsPanel /> },
+    { n: 3, title: 'Policy grounding',       body: (
+      <section className="panel policy-grounding-card" aria-labelledby="method-policy-title">
+        <div className="section-heading">
+          <div><span className="eyebrow">RAG sidecar</span><h2 id="method-policy-title">Risk-aware policy retrieval</h2></div>
+          <Database aria-hidden="true" />
+        </div>
+        <PolicyGroundingPanel
+          grounding={policyGrounding}
+          loading={policyGroundingLoading}
+          error={policyGroundingError}
+          onRefresh={refreshPolicyGrounding}
+        />
+      </section>
+    ) },
+    { n: 4, title: 'Methodology',           body: <MethodologyDetails /> },
+    { n: 5, title: 'Local evaluation summary', body: <LocalEvaluationPanel /> },
+    { n: 6, title: 'Q&A',                   body: <QAWidget selectedScenario={selectedScenario} currentRun={currentRun} /> },
+    { n: 7, title: 'Artifacts',             body: <ArtifactLinks run={currentRun} /> },
+    { n: 8, title: 'Run history',           body: <EvidenceLedger refreshKey={currentRun?.id ?? 'none'} /> },
+    { n: 9, title: 'Settings · OpenAI key', body: <UserKeySettings /> },
+    { n: 10, title: 'Diagnostics',          body: <DiagnosticsPanel /> },
   ];
 
   return (

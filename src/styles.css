@@ -1746,6 +1746,148 @@ h3 {
   line-height: 1.45;
 }
 
+.policy-grounding-panel {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid #ece9e1;
+  padding-top: 14px;
+}
+
+.policy-grounding-card {
+  padding: 22px;
+}
+
+.policy-grounding-card .policy-grounding-panel {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.policy-grounding-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.policy-grounding-head h3 {
+  margin: 2px 0 0;
+  color: #232323;
+  font-size: 18px;
+}
+
+.policy-context-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.policy-context-grid div {
+  border: 1px solid #d8d2c8;
+  border-radius: 10px;
+  background: #fffcf6;
+  padding: 9px 10px;
+  min-width: 0;
+}
+
+.policy-context-grid span,
+.policy-chunk-list small {
+  display: block;
+  color: #666a73;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.policy-context-grid strong {
+  display: block;
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+  color: #232323;
+  font-size: 13px;
+}
+
+.policy-risk-tags {
+  margin-top: 0;
+}
+
+.policy-chunk-list {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.policy-chunk-list li,
+.policy-empty-state {
+  border: 1px solid #d8d2c8;
+  border-radius: 10px;
+  background: #fffcf6;
+  padding: 10px 12px;
+}
+
+.policy-chunk-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #232323;
+}
+
+.policy-chunk-title svg,
+.policy-empty-state svg {
+  width: 15px;
+  height: 15px;
+  color: #4c6f64;
+  flex: 0 0 auto;
+}
+
+.policy-chunk-title strong {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.policy-chunk-title span {
+  color: #4c6f64;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.policy-chunk-list p,
+.policy-empty-state p {
+  margin: 6px 0 0;
+  color: #4f5660;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.policy-chunk-list small {
+  margin-top: 6px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.policy-empty-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.policy-empty-state p {
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .policy-context-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .policy-grounding-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .custom-scenario-form {
   display: grid;
   gap: 16px;

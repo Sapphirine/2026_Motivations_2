@@ -2,6 +2,7 @@ import type { AgentOutput, AxisId, AxisWeight, Env, ExperimentRun, GenerationSet
 import { writeRunArtifacts } from './artifacts';
 import { assertLiveOpenAIConfig, getConfig } from './config';
 import { computeMetrics, synthesizeRun } from './metrics';
+import { attachPolicyCompliance, retrievePolicyGrounding } from './policy-rag';
 import { problem, problemError } from './problem';
 import { runModeratorCommentary, runProfileProvider } from './provider';
 import { findRunByIdempotencyKeyInD1, getProfiles, getRunAuthoritative, getRunByIdempotencyKey, getScenario, id, nowSeconds, reserveRunForIdempotency, saveOutputs, saveRun, saveSensitivityRun } from './storage';
@@ -55,6 +56,7 @@ export async function runExperiment(
   const modelName = input.modelName ?? config.openAIModel;
   const generationSettings = input.generationSettings ?? config.generationSettings;
   const trialCount = clampTrialCount(input.trialCount ?? 1);
+  const policyGrounding = await retrievePolicyGrounding(env, scenario);
   const createdAt = nowSeconds();
   const candidate: ExperimentRun = {
     id: id('run'),
@@ -73,6 +75,7 @@ export async function runExperiment(
     startedAt: createdAt,
     trialCount,
     batteryId: input.batteryId,
+    policyGrounding,
   };
 
   const reservation = await reserveRunForIdempotency(env, candidate);
@@ -85,6 +88,7 @@ export async function runExperiment(
   // hydrated path would not — we set them either way to be safe).
   run.trialCount = trialCount;
   run.batteryId = input.batteryId;
+  run.policyGrounding = policyGrounding;
 
   try {
     // Generate (profile, trialIndex) cell pairs. Total = profiles × trialCount.
@@ -99,9 +103,10 @@ export async function runExperiment(
 
     const settled = await Promise.allSettled(cellPlans.map(async (cell): Promise<AgentOutput> => {
       const result = await withBudget(
-        runProfileProvider(env, modelName, generationSettings, scenario, cell.profile, userKey),
+        runProfileProvider(env, modelName, generationSettings, scenario, cell.profile, userKey, policyGrounding),
         config.runTimeoutSeconds * 1000,
       );
+      const structuredDecision = attachPolicyCompliance(result.structuredDecision, policyGrounding);
       return {
         id: id('output'),
         runId: run.id,
@@ -109,9 +114,9 @@ export async function runExperiment(
         profileSnapshot: cell.profile,
         translatedPrompt: result.prompt,
         rawOutput: result.rawOutput,
-        structuredDecision: result.structuredDecision,
-        driveTrace: result.structuredDecision.driveAttributions,
-        confidence: result.structuredDecision.confidence,
+        structuredDecision,
+        driveTrace: structuredDecision.driveAttributions,
+        confidence: structuredDecision.confidence,
         status: 'completed',
         createdAt: nowSeconds(),
         trialIndex: cell.trialIndex,
@@ -318,14 +323,16 @@ export async function runSensitivity(env: Env, runId: string, profileId: Profile
   try {
     if (isDemo) {
       const demoProfile = perturbedProfileForDemo(perturbedProfile, axisChanges);
-      const demoResult = await runProfileProvider(env, baseRun.modelName, baseRun.generationSettings, scenario, demoProfile, userKey);
-      rerunDecision = demoResult.structuredDecision;
+      const policyGrounding = baseRun.policyGrounding ?? await retrievePolicyGrounding(env, scenario);
+      const demoResult = await runProfileProvider(env, baseRun.modelName, baseRun.generationSettings, scenario, demoProfile, userKey, policyGrounding);
+      rerunDecision = attachPolicyCompliance(demoResult.structuredDecision, policyGrounding);
     } else {
+      const policyGrounding = baseRun.policyGrounding ?? await retrievePolicyGrounding(env, scenario);
       const live = await withBudget(
-        runProfileProvider(env, baseRun.modelName, baseRun.generationSettings, scenario, perturbedProfile, userKey),
+        runProfileProvider(env, baseRun.modelName, baseRun.generationSettings, scenario, perturbedProfile, userKey, policyGrounding),
         config.runTimeoutSeconds * 1000,
       );
-      rerunDecision = live.structuredDecision;
+      rerunDecision = attachPolicyCompliance(live.structuredDecision, policyGrounding);
     }
   } catch (error) {
     console.error('[sensitivity] rerun failed for run', runId, 'profile', profileId, error instanceof Error ? error.message : error);
@@ -466,6 +473,8 @@ export async function retryProfileForRun(
   const scenario = run.scenarioSnapshot;
   const modelName = run.modelName;
   const generationSettings = run.generationSettings;
+  const policyGrounding = run.policyGrounding ?? await retrievePolicyGrounding(env, scenario);
+  run.policyGrounding = policyGrounding;
 
   // Compute the next trial_index for this profile so retries don't collide
   // with whatever (zero or more) outputs already exist.
@@ -481,9 +490,10 @@ export async function retryProfileForRun(
   for (let t = 0; t < trialCount; t += 1) {
     try {
       const result = await withBudget(
-        runProfileProvider(env, modelName, generationSettings, scenario, profile, userKey),
+        runProfileProvider(env, modelName, generationSettings, scenario, profile, userKey, policyGrounding),
         config.runTimeoutSeconds * 1000,
       );
+      const structuredDecision = attachPolicyCompliance(result.structuredDecision, policyGrounding);
       newOutputs.push({
         id: id('output'),
         runId: run.id,
@@ -491,9 +501,9 @@ export async function retryProfileForRun(
         profileSnapshot: profile,
         translatedPrompt: result.prompt,
         rawOutput: result.rawOutput,
-        structuredDecision: result.structuredDecision,
-        driveTrace: result.structuredDecision.driveAttributions,
-        confidence: result.structuredDecision.confidence,
+        structuredDecision,
+        driveTrace: structuredDecision.driveAttributions,
+        confidence: structuredDecision.confidence,
         status: 'completed',
         createdAt: nowSeconds(),
         trialIndex: nextTrialIndex,

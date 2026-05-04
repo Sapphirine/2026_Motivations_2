@@ -82,7 +82,43 @@ export type StructuredDecision = {
   }>;
   confidence: number | null;
   riskNotes: string[];
+  policyCompliance?: PolicyComplianceCheck;
   notAdviceDisclaimer: true;
+};
+
+export type RiskContext = {
+  domain: string;
+  affectedStakeholders: string[];
+  riskTypes: string[];
+  deploymentStage: string;
+  detectionSignals: string[];
+};
+
+export type PolicyGroundingChunk = {
+  id: string;
+  title: string;
+  source: string;
+  domain: string;
+  riskTypes: string[];
+  stakeholders: string[];
+  deploymentStage: string;
+  text: string;
+  score: number | null;
+};
+
+export type PolicyGroundingResult = {
+  enabled: boolean;
+  mode: 'chroma' | 'fallback' | 'disabled';
+  riskContext: RiskContext;
+  chunks: PolicyGroundingChunk[];
+  warning?: string;
+};
+
+export type PolicyComplianceCheck = {
+  status: 'pass' | 'review' | 'unavailable';
+  coveredRiskTypes: string[];
+  missingRiskTypes: string[];
+  evidence: string[];
 };
 
 export type AgentOutput = {
@@ -203,6 +239,7 @@ export type ExperimentRun = {
   // Three-Layer redesign (added 2026-04-27).
   trialCount?: number;
   batteryId?: string;
+  policyGrounding?: PolicyGroundingResult;
 };
 
 export type ProblemDetails = {
@@ -326,4 +363,6 @@ export type Env = {
   ARTIFACT_MAX_BYTES?: string;
   ARTIFACT_RETENTION_DAYS?: string;
   DEMO_MODE?: string;
+  POLICY_RAG_ENABLED?: string;
+  POLICY_RAG_ORIGIN?: string;
 };

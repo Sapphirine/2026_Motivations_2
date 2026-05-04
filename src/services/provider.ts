@@ -1,4 +1,4 @@
-import type { AgentOutput, Env, GenerationSettings, ModeratorAICommentary, ModeratorSynthesis, Scenario, StructuredDecision, ValueProfile } from '../domain/types';
+import type { AgentOutput, Env, GenerationSettings, ModeratorAICommentary, ModeratorSynthesis, PolicyGroundingResult, Scenario, StructuredDecision, ValueProfile } from '../domain/types';
 import { extractRationaleAxis, type RationaleExtraction } from '../extractors/rationale-values';
 import { judgeOption, type JudgeResult } from '../judges/value-judge';
 import { getConfig } from './config';
@@ -357,14 +357,14 @@ async function withBudget<T>(promise: Promise<T>, milliseconds: number): Promise
   }
 }
 
-export async function runProfileProvider(env: Env, model: string, settings: GenerationSettings, scenario: Scenario, profile: ValueProfile, userKey?: string): Promise<ProviderResult> {
-  const prompt = translateProfilePrompt(profile, scenario);
+export async function runProfileProvider(env: Env, model: string, settings: GenerationSettings, scenario: Scenario, profile: ValueProfile, userKey?: string, policyGrounding?: PolicyGroundingResult): Promise<ProviderResult> {
+  const prompt = translateProfilePrompt(profile, scenario, policyGrounding);
   // FIX 2: key priority is userKey -> env.OPENAI_API_KEY -> demo fallback.
   // The DEMO_MODE env var still overrides everything (preserves the
   // existing demo-only deploy story).
   const effectiveKey = selectOpenAIKey(env, userKey);
   if ((env.DEMO_MODE ?? 'true') === 'true' || !effectiveKey) {
-    return mockProviderResult(model, settings, scenario, profile, prompt);
+    return mockProviderResult(model, settings, scenario, profile, prompt, policyGrounding);
   }
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -427,10 +427,14 @@ function inferQuestionFocus(question: string): string {
   return 'general comparison';
 }
 
-function mockProviderResult(model: string, settings: GenerationSettings, scenario: Scenario, profile: ValueProfile, prompt: string): ProviderResult {
+function mockProviderResult(model: string, settings: GenerationSettings, scenario: Scenario, profile: ValueProfile, prompt: string, policyGrounding?: PolicyGroundingResult): ProviderResult {
   const selected = selectMockOption(scenario, profile);
   const rankedOptions = [selected.id, ...scenario.decisionOptions.map((option) => option.id).filter((id) => id !== selected.id)];
   const topDrive = [...profile.axisWeights].sort((a, b) => b.value - a.value)[0];
+  const topPolicy = policyGrounding?.chunks?.[0];
+  const policyTail = topPolicy
+    ? ` Policy safeguard: use ${topPolicy.title.toLowerCase()} from ${topPolicy.source} as a grounding constraint.`
+    : '';
   const decision: StructuredDecision = {
     selectedOptionId: selected.id,
     rankedOptions,
@@ -440,11 +444,15 @@ function mockProviderResult(model: string, settings: GenerationSettings, scenari
       motivationProfile: profile.name,
       retrievedStrategy: selected.label,
       microAction: selected.description,
-      ifThenPlan: 'If the first trial creates extra rework, stop and switch to a lower-risk support task.',
+      ifThenPlan: topPolicy
+        ? `If the trial conflicts with ${topPolicy.riskTypes.slice(0, 2).join(' or ') || 'the retrieved policy constraints'}, stop and add human review before continuing.`
+        : 'If the first trial creates extra rework, stop and switch to a lower-risk support task.',
       accountabilityScript: 'I am testing AI on a bounded support task and tracking where it helps versus creates rework.',
-      successMetric: 'One completed low-risk trial with a clear keep/change/stop decision.',
+      successMetric: topPolicy
+        ? 'One completed low-risk trial with a keep/change/stop decision and documented policy safeguard check.'
+        : 'One completed low-risk trial with a clear keep/change/stop decision.',
     },
-    rationale: `${profile.name} emphasizes ${topDrive.label.toLowerCase()} while comparing ${scenario.tradeoffs.slice(0, 2).join(' and ')} for AI workflow adoption.`,
+    rationale: `${profile.name} emphasizes ${topDrive.label.toLowerCase()} while comparing ${scenario.tradeoffs.slice(0, 2).join(' and ')} for AI workflow adoption.${policyTail}`,
     tradeoffs: scenario.tradeoffs.slice(0, 3).map((dimension) => ({ dimension, assessment: `${profile.name} weighs ${dimension} through the ${topDrive.label.toLowerCase()} adoption lens.` })),
     driveAttributions: profile.axisWeights.map((weight) => ({
       drive: weight.axis,
@@ -453,7 +461,12 @@ function mockProviderResult(model: string, settings: GenerationSettings, scenari
       evidence: `${weight.label} was ${weight.level} in the profile matrix.`,
     })),
     confidence: null,
-    riskNotes: ['Fictional experimental output only.', 'Confidence not measured in demo mode.', 'Not HR, employment, or real-world adoption advice.'],
+    riskNotes: [
+      'Fictional experimental output only.',
+      'Confidence not measured in demo mode.',
+      ...(topPolicy ? [`Policy grounding used: ${topPolicy.title} (${topPolicy.source}).`] : []),
+      'Not HR, employment, or real-world adoption advice.',
+    ],
     notAdviceDisclaimer: true,
   };
 
