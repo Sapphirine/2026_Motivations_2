@@ -702,6 +702,304 @@ function RunLivePanel({
 }
 
 // ============================================================================
+// Final Recommendation Panel: synthesize all agent outputs into a clear answer
+// ============================================================================
+const OPTION_LABELS = {
+  option_a: { short: 'Option A', long: 'Outcome-focused adoption challenge' },
+  option_b: { short: 'Option B', long: 'Bounded safety pilot' },
+  option_c: { short: 'Option C', long: 'Stakeholder trust review' },
+  option_d: { short: 'Option D', long: 'User-choice exploration sandbox' },
+};
+
+function getOptionLabel(optionId, scenario) {
+  // Try scenario-specific labels first.
+  if (scenario?.decisionOptions) {
+    const opt = scenario.decisionOptions.find((o) => o.id === optionId);
+    if (opt) return opt.label || opt.description?.slice(0, 60) || optionId;
+  }
+  return OPTION_LABELS[optionId]?.long ?? optionId;
+}
+
+function getOptionShort(optionId) {
+  return OPTION_LABELS[optionId]?.short ?? optionId;
+}
+
+function FinalRecommendationPanel({ profiles, outputsArrayByProfile, alignmentByProfile, perAgent, heatmap, selectedScenario, run }) {
+  // Aggregate: what did each profile pick as its modal (most frequent) option?
+  const profilePicks = useMemo(() => {
+    const picks = [];
+    for (const p of profiles) {
+      const outputs = outputsArrayByProfile?.[p.id] ?? [];
+      if (outputs.length === 0) continue;
+      const counts = {};
+      for (const o of outputs) {
+        const key = o?.structuredDecision?.selectedOptionId;
+        if (key) counts[key] = (counts[key] ?? 0) + 1;
+      }
+      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+      if (sorted.length > 0) {
+        const [modal, count] = sorted[0];
+        const stability = Math.round((count / outputs.length) * 100);
+        const rationale = outputs.find((o) => o?.structuredDecision?.selectedOptionId === modal)?.structuredDecision?.rationale;
+        picks.push({
+          profileId: p.id,
+          profileName: p.name,
+          modal,
+          count,
+          total: outputs.length,
+          stability,
+          rationale: rationale?.slice(0, 300) ?? null,
+          alignment: alignmentByProfile?.[p.id] ?? null,
+        });
+      }
+    }
+    return picks;
+  }, [profiles, outputsArrayByProfile, alignmentByProfile]);
+
+  // Consensus analysis.
+  const consensus = useMemo(() => {
+    if (profilePicks.length === 0) return null;
+    const optionCounts = {};
+    for (const pick of profilePicks) {
+      optionCounts[pick.modal] = (optionCounts[pick.modal] ?? 0) + 1;
+    }
+    const sorted = Object.entries(optionCounts).sort((a, b) => b[1] - a[1]);
+    const [topOption, topCount] = sorted[0];
+    const totalProfiles = profilePicks.length;
+    const unanimity = topCount === totalProfiles ? 'unanimous' : topCount >= totalProfiles * 0.75 ? 'strong' : topCount >= totalProfiles * 0.5 ? 'majority' : 'split';
+    const dissenters = profilePicks.filter((p) => p.modal !== topOption);
+    return { topOption, topCount, totalProfiles, unanimity, dissenters, allOptions: sorted };
+  }, [profilePicks]);
+
+  // Boundary map flip summary.
+  const flipSummary = useMemo(() => {
+    const cells = heatmap?.cells ?? [];
+    if (cells.length === 0) return null;
+    const flipped = cells.filter((c) => c.flipped === true);
+    const stable = cells.filter((c) => c.flipped === false);
+    return {
+      total: cells.length,
+      flippedCount: flipped.length,
+      stableCount: stable.length,
+      flippedCells: flipped.map((c) => ({
+        profile: profileNameById[c.profileId] ?? c.profileId,
+        axis: axes.find((a) => a.id === c.axisId)?.full ?? c.axisId,
+        from: getOptionShort(c.lowOption),
+        to: getOptionShort(c.highOption),
+      })),
+    };
+  }, [heatmap]);
+
+  // Three-layer alignment summary.
+  const alignmentSummary = useMemo(() => {
+    if (!Array.isArray(perAgent) || perAgent.length === 0) return null;
+    const patterns = {};
+    for (const row of perAgent) {
+      if (row.alignment) {
+        patterns[row.alignment] = (patterns[row.alignment] ?? 0) + 1;
+      }
+    }
+    return patterns;
+  }, [perAgent]);
+
+  const hasOutputs = profilePicks.length > 0;
+  const isComplete = run && ['completed', 'partial'].includes(run.status) && hasOutputs;
+  const hasThreeLayerAudit = Boolean(alignmentSummary);
+  const hasBoundaryAudit = Boolean(flipSummary);
+  const visibleFlippedCells = flipSummary?.flippedCells?.slice(0, 8) ?? [];
+  const hiddenFlipCount = Math.max(0, (flipSummary?.flippedCells?.length ?? 0) - visibleFlippedCells.length);
+
+  if (!isComplete) {
+    return (
+      <section className="panel final-recommendation" aria-labelledby="final-rec-title">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">MotiveOps synthesis</span>
+            <h2 id="final-rec-title">Recommended next action</h2>
+          </div>
+          <ShieldCheck aria-hidden="true" />
+        </div>
+        <p className="panel-note dim-note">Run an experiment above to generate the profile-grounded recommendation.</p>
+      </section>
+    );
+  }
+
+  const unanimityLabels = {
+    unanimous: { text: 'Unanimous consensus', cls: 'consensus-unanimous' },
+    strong: { text: 'Strong consensus', cls: 'consensus-strong' },
+    majority: { text: 'Majority consensus', cls: 'consensus-majority' },
+    split: { text: 'Split decision', cls: 'consensus-split' },
+  };
+  const consensusInfo = unanimityLabels[consensus?.unanimity] ?? unanimityLabels.split;
+
+  return (
+    <section className="panel final-recommendation" aria-labelledby="final-rec-title">
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">MotiveOps synthesis</span>
+          <h2 id="final-rec-title">Recommended next action</h2>
+        </div>
+        <ShieldCheck aria-hidden="true" />
+      </div>
+
+      <div className="recommendation-readiness" aria-label="Recommendation audit readiness">
+        <span className="readiness-chip is-ready">Agent outputs ready</span>
+        <span className={`readiness-chip ${hasThreeLayerAudit ? 'is-ready' : 'is-pending'}`}>
+          {hasThreeLayerAudit ? 'L1/L2/L3 audit ready' : 'L1/L2/L3 audit pending'}
+        </span>
+        <span className={`readiness-chip ${hasBoundaryAudit ? 'is-ready' : 'is-pending'}`}>
+          {hasBoundaryAudit ? 'Boundary map ready' : 'Boundary map pending'}
+        </span>
+      </div>
+      <p className="panel-note">
+        This synthesis is generated from the four motivation-profile agents. The audit and sensitivity sections populate after
+        you run Three-Layer Analysis and Boundary Map.
+      </p>
+
+      {/* Hero recommendation */}
+      <div className={`recommendation-hero ${consensusInfo.cls}`}>
+        <span className="recommendation-badge">{consensusInfo.text}</span>
+        <h3 className="recommendation-option">
+          {getOptionShort(consensus.topOption)}: {getOptionLabel(consensus.topOption, selectedScenario)}
+        </h3>
+        <p className="recommendation-subtitle">
+          {consensus.topCount} of {consensus.totalProfiles} motivation profiles recommended this intervention across {profilePicks[0]?.total ?? 5} trials each.
+        </p>
+      </div>
+
+      {/* Actionable summary */}
+      <div className="recommendation-action">
+        <span className="eyebrow">Actionable summary</span>
+        <div className="action-card">
+          <p>
+            <strong>Recommended next action:</strong> {getOptionLabel(consensus.topOption, selectedScenario)}.
+          </p>
+          {consensus.dissenters.length > 0 ? (
+            <p>
+              <strong>Address dissent:</strong> The {consensus.dissenters.map((d) => d.profileName).join(' and ')} profile{consensus.dissenters.length > 1 ? 's' : ''} preferred
+              {' '}{consensus.dissenters.map((d) => getOptionShort(d.modal)).join(' / ')} respectively.
+              Consider incorporating elements from {consensus.dissenters.length > 1 ? 'these alternatives' : 'this alternative'} to
+              address {consensus.dissenters.map((d) => d.profileName.toLowerCase()).join(' and ')} motivational needs.
+            </p>
+          ) : null}
+          {!flipSummary ? (
+            <p>
+              <strong>Boundary status:</strong> Boundary Map has not run yet. Run it to test whether a motivation-axis shift changes this recommendation.
+            </p>
+          ) : flipSummary.flippedCells.length > 0 ? (
+            <p>
+              <strong>Monitor:</strong> {flipSummary.flippedCells.length} load-bearing contrast{flipSummary.flippedCells.length > 1 ? 's' : ''} appeared
+              {visibleFlippedCells.length > 0 ? `, including ${visibleFlippedCells.map((c) => `${c.profile}/${c.axis}`).join(', ')}` : ''}.
+              If organizational weight on {flipSummary.flippedCells.length > 1 ? 'these axes' : 'this axis'} shifts, the recommendation may change.
+            </p>
+          ) : (
+            <p>
+              <strong>Boundary status:</strong> No axis perturbation flipped the recommendation. The intervention was robust across the tested low-vs-high contrasts.
+            </p>
+          )}
+        </div>
+      </div>
+
+      <details className="recommendation-evidence">
+        <summary>Evidence behind this recommendation</summary>
+        <div className="recommendation-evidence-body">
+          {/* Per-profile breakdown table */}
+          <div className="recommendation-breakdown">
+            <span className="eyebrow">Per-profile recommendations</span>
+            <table className="recommendation-table">
+              <thead>
+                <tr>
+                  <th>Profile</th>
+                  <th>Recommended</th>
+                  <th>Stability</th>
+                  <th>Alignment</th>
+                </tr>
+              </thead>
+              <tbody>
+                {profilePicks.map((pick) => (
+                  <tr key={pick.profileId} className={pick.modal === consensus.topOption ? 'rec-row-consensus' : 'rec-row-dissent'}>
+                    <td><strong>{pick.profileName}</strong></td>
+                    <td>{getOptionShort(pick.modal)} - {getOptionLabel(pick.modal, selectedScenario)}</td>
+                    <td>{pick.stability}% ({pick.count}/{pick.total})</td>
+                    <td>
+                      {pick.alignment ? (
+                        <span className={`lane-alignment-pill alignment-${pick.alignment.toLowerCase()}`}>{pick.alignment}</span>
+                      ) : <span className="dim-note">-</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Dissent analysis */}
+          {consensus.dissenters.length > 0 ? (
+            <div className="recommendation-dissent">
+              <span className="eyebrow">Dissenting perspectives</span>
+              {consensus.dissenters.map((d) => (
+                <div key={d.profileId} className="dissent-card">
+                  <strong>{d.profileName}</strong> recommended <strong>{getOptionShort(d.modal)}</strong> - {getOptionLabel(d.modal, selectedScenario)}
+                  {d.rationale ? <p className="dissent-rationale">"{d.rationale}"</p> : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {/* Three-layer alignment audit */}
+          {alignmentSummary ? (
+            <div className="recommendation-audit">
+              <span className="eyebrow">Motivation alignment audit (L1/L2/L3)</span>
+              <div className="audit-chips">
+                {Object.entries(alignmentSummary).map(([pattern, count]) => (
+                  <span key={pattern} className={`audit-chip alignment-${pattern.toLowerCase()}`}>
+                    {pattern}: {count} profile{count > 1 ? 's' : ''}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Boundary map insights */}
+          {flipSummary ? (
+            <div className="recommendation-boundary">
+              <span className="eyebrow">Sensitivity boundary analysis</span>
+              <p className="panel-note">
+                {flipSummary.flippedCount} of {flipSummary.total} axis-weight contrasts changed the recommended intervention.
+                {flipSummary.flippedCount === 0
+                  ? ' The recommendation is robust: no single axis perturbation flipped the decision.'
+                  : ` ${flipSummary.stableCount} contrasts were stable.`}
+              </p>
+              {visibleFlippedCells.length > 0 ? (
+                <table className="recommendation-table flip-table">
+                  <thead>
+                    <tr>
+                      <th>Profile</th>
+                      <th>Load-bearing axis</th>
+                      <th>Low to high</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleFlippedCells.map((cell, i) => (
+                      <tr key={`flip-${i}`}>
+                        <td>{cell.profile}</td>
+                        <td><strong>{cell.axis}</strong></td>
+                        <td>{cell.from} to {cell.to}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : null}
+              {hiddenFlipCount > 0 ? <p className="panel-note dim-note">Showing 8 of {flipSummary.flippedCells.length} flipped contrasts.</p> : null}
+            </div>
+          ) : null}
+        </div>
+      </details>
+    </section>
+  );
+}
+
+
+// ============================================================================
 // Three-Layer tab: run picker + 4 charts + 4 alignment badges
 // ============================================================================
 const TERMINAL_RUN_STATUSES = new Set(['completed', 'partial', 'failed']);
@@ -1933,7 +2231,7 @@ function App() {
         body: JSON.stringify({
           idempotencyKey,
           scenarioIds,
-          errorBudget: 4,
+          errorBudget: Math.max(4, Math.ceil(profiles.length * axes.length * scenarioIds.length * 0.5)),
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -2140,6 +2438,21 @@ function App() {
     },
     {
       n: 2,
+      title: 'Recommended next action',
+      body: (
+        <FinalRecommendationPanel
+          profiles={profiles}
+          outputsArrayByProfile={outputsArrayByProfile}
+          alignmentByProfile={alignmentByProfile}
+          perAgent={perAgent}
+          heatmap={heatmap}
+          selectedScenario={selectedScenario}
+          run={currentRun}
+        />
+      ),
+    },
+    {
+      n: 3,
       title: 'Watch the four agents respond',
       body: (
         <RunLivePanel

@@ -43,9 +43,15 @@ import {
 
 const ALL_AXES: readonly JudgeAxisId[] = ['achievement', 'self_direction', 'security', 'benevolence'];
 const ALL_PROFILES: readonly ProfileId[] = ['achievement', 'exploration', 'preservation', 'neutral'];
-const BATCH_SIZE = 4;
-const TICK_BUDGET_MS = 25_000;
+const BATCH_SIZE = 2;
+const TICK_BUDGET_MS = 300_000;
 const PER_CELL_TIMEOUT_MS = 25_000;
+const INTER_BATCH_DELAY_MS = 5_000;
+const RATE_LIMIT_RETRY_COUNT = 3;
+const RATE_LIMIT_BACKOFF_MS = 10_000;
+
+/** In-memory lock: only one runGridBatches per jobId at a time. */
+const activeGridRunners = new Set<string>();
 
 /**
  * Map between the legacy AxisId (camelCase, used in profile snapshots)
@@ -127,19 +133,29 @@ export async function startSensitivityGridJob(env: Env, input: SensitivityGridIn
  * case is a duplicated provider call rather than corrupted data.)
  */
 export async function runGridBatches(env: Env, jobId: string, userKey?: string): Promise<void> {
+  if (activeGridRunners.has(jobId)) {
+    console.log(`[grid] ⏭ skipping runGridBatches for ${jobId} — another runner is active`);
+    return;
+  }
+  activeGridRunners.add(jobId);
   const tickStart = Date.now();
+  console.log(`[grid] ▶ runGridBatches started for ${jobId}, tickBudget=${TICK_BUDGET_MS}ms, userKey=${userKey ? 'present' : 'MISSING'}`);
 
+  try {
   while (Date.now() - tickStart < TICK_BUDGET_MS) {
     const job = await getGridJob(env, jobId);
     if (!job) {
       console.warn('[grid] job missing, abort:', jobId);
       return;
     }
+    console.log(`[grid] loop: status=${job.status}, completed=${job.completedCells}/${job.totalCells}, failed=${job.failedCells}, errorBudget=${job.errorBudget}, elapsed=${Date.now() - tickStart}ms`);
     if (job.status === 'completed' || job.status === 'partial' || job.status === 'failed') {
+      console.log(`[grid] ■ job already terminal: ${job.status}`);
       return;
     }
 
     if (job.failedCells >= job.errorBudget) {
+      console.log(`[grid] ■ error budget exhausted: ${job.failedCells} >= ${job.errorBudget}`);
       job.status = 'partial';
       job.completedAt = nowSeconds();
       await updateGridJob(env, job);
@@ -150,6 +166,7 @@ export async function runGridBatches(env: Env, jobId: string, userKey?: string):
       job.status = 'completed';
       job.completedAt = nowSeconds();
       await updateGridJob(env, job);
+      console.log('[grid] ✓ all cells completed');
       return;
     }
 
@@ -160,8 +177,10 @@ export async function runGridBatches(env: Env, jobId: string, userKey?: string):
 
     const pendingCells = computePendingCells(job);
     const batch = pendingCells.slice(0, BATCH_SIZE);
+    console.log(`[grid] pending=${pendingCells.length}, batch=${batch.length}, profiles=[${batch.map(c => c.profileId + '/' + c.axisId).join(', ')}]`);
     if (batch.length === 0) {
       // Nothing pending but counters not equal to total — terminal mismatch.
+      console.log(`[grid] ■ no pending cells left, marking terminal`);
       job.status = job.failedCells > 0 ? 'partial' : 'completed';
       job.completedAt = nowSeconds();
       await updateGridJob(env, job);
@@ -169,6 +188,17 @@ export async function runGridBatches(env: Env, jobId: string, userKey?: string):
     }
 
     await processCellBatch(env, job, batch, userKey);
+    console.log(`[grid] batch done: completed=${job.completedCells}/${job.totalCells}, failed=${job.failedCells}`);
+
+    // Cooldown between batches to avoid OpenAI 429 rate limits.
+    if (Date.now() - tickStart < TICK_BUDGET_MS) {
+      console.log(`[grid] waiting ${INTER_BATCH_DELAY_MS}ms before next batch...`);
+      await new Promise((resolve) => setTimeout(resolve, INTER_BATCH_DELAY_MS));
+    }
+  }
+  console.log(`[grid] ■ tick budget expired after ${Date.now() - tickStart}ms`);
+  } finally {
+    activeGridRunners.delete(jobId);
   }
 }
 
@@ -277,9 +307,11 @@ async function processOneCell(
   plan: CellPlan,
   userKey?: string,
 ): Promise<{ cell?: SensitivityGridCell; error?: SensitivityGridCellError }> {
+  const cellLabel = `${plan.profileId}/${plan.axisId}`;
   const scenario = getScenario(plan.scenarioId);
   const profile = valueProfiles.find((p) => p.id === plan.profileId);
   if (!scenario || !profile) {
+    console.error(`[grid] ✗ ${cellLabel}: scenario=${!!scenario} profile=${!!profile} scenarioId=${plan.scenarioId}`);
     return {
       error: {
         scenarioId: plan.scenarioId,
@@ -310,37 +342,49 @@ async function processOneCell(
   const config = getConfig(env);
   const policyGrounding = await retrievePolicyGrounding(env, scenario);
 
-  try {
-    const lowResult = await withBudget(
-      runProfileProvider(env, env.OPENAI_MODEL ?? 'gpt-5.4-nano', config.generationSettings, scenario, lowProfile, userKey, policyGrounding),
-      PER_CELL_TIMEOUT_MS,
-    );
-    const lowDecision = attachPolicyCompliance(lowResult.structuredDecision, policyGrounding);
-    lowOption = lowDecision.selectedOptionId;
-    lowRationale = lowDecision.rationale ?? '';
-    lowCellRunId = makeId('celllow');
+  for (let attempt = 1; attempt <= RATE_LIMIT_RETRY_COUNT; attempt++) {
+    try {
+      const lowResult = await withBudget(
+        runProfileProvider(env, env.OPENAI_MODEL ?? 'gpt-5.4-nano', config.generationSettings, scenario, lowProfile, userKey, policyGrounding),
+        PER_CELL_TIMEOUT_MS,
+      );
+      const lowDecision = attachPolicyCompliance(lowResult.structuredDecision, policyGrounding);
+      lowOption = lowDecision.selectedOptionId;
+      lowRationale = lowDecision.rationale ?? '';
+      lowCellRunId = makeId('celllow');
 
-    const highResult = await withBudget(
-      runProfileProvider(env, env.OPENAI_MODEL ?? 'gpt-5.4-nano', config.generationSettings, scenario, highProfile, userKey, policyGrounding),
-      PER_CELL_TIMEOUT_MS,
-    );
-    const highDecision = attachPolicyCompliance(highResult.structuredDecision, policyGrounding);
-    highOption = highDecision.selectedOptionId;
-    highRationale = highDecision.rationale ?? '';
-    highCellRunId = makeId('cellhigh');
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      error: {
-        scenarioId: plan.scenarioId,
-        profileId: plan.profileId,
-        axisId: plan.axisId,
-        errorType: /budget exceeded|abort/i.test(message) ? 'timeout' : /OpenAI/i.test(message) ? 'openai' : 'parse',
-        message: message.slice(0, 280),
-        attempts: 1,
-        loggedAt: nowSeconds(),
-      },
-    };
+      const highResult = await withBudget(
+        runProfileProvider(env, env.OPENAI_MODEL ?? 'gpt-5.4-nano', config.generationSettings, scenario, highProfile, userKey, policyGrounding),
+        PER_CELL_TIMEOUT_MS,
+      );
+      const highDecision = attachPolicyCompliance(highResult.structuredDecision, policyGrounding);
+      highOption = highDecision.selectedOptionId;
+      highRationale = highDecision.rationale ?? '';
+      highCellRunId = makeId('cellhigh');
+      break; // Success — exit retry loop.
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const is429 = /429|rate_limit/i.test(message);
+      if (is429 && attempt < RATE_LIMIT_RETRY_COUNT) {
+        const backoff = RATE_LIMIT_BACKOFF_MS * attempt;
+        console.warn(`[grid] ⏳ ${cellLabel} rate-limited (attempt ${attempt}/${RATE_LIMIT_RETRY_COUNT}), waiting ${backoff}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, backoff));
+        continue;
+      }
+      const errorType = /budget exceeded|abort/i.test(message) ? 'timeout' : /OpenAI/i.test(message) ? 'openai' : 'parse';
+      console.error(`[grid] ✗ ${cellLabel} FAILED: type=${errorType} msg=${message.slice(0, 200)}`);
+      return {
+        error: {
+          scenarioId: plan.scenarioId,
+          profileId: plan.profileId,
+          axisId: plan.axisId,
+          errorType,
+          message: message.slice(0, 280),
+          attempts: attempt,
+          loggedAt: nowSeconds(),
+        },
+      };
+    }
   }
 
   const flipped = lowOption === null || highOption === null
@@ -366,6 +410,7 @@ async function processOneCell(
     cellRunId: highCellRunId,
     completedAt: nowSeconds(),
   };
+  console.log(`[grid] ✓ ${cellLabel}: low=${lowOption} high=${highOption} flipped=${flipped}`);
   return { cell };
 }
 
