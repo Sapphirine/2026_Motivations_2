@@ -1555,6 +1555,121 @@ function LocalEvaluationPanel() {
   );
 }
 
+function PolicyRagEvaluationPanel() {
+  const [summary, setSummary] = useState(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch('/api/evaluations/policy-rag', { cache: 'no-store' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw data || new Error('Policy RAG evaluation unavailable');
+      setSummary(data);
+    } catch (err) {
+      setSummary(null);
+      setError(getProblemMessage(err, 'Policy RAG evaluation unavailable.'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const response = await fetch('/api/evaluations/policy-rag', { cache: 'no-store' });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw data || new Error('Policy RAG evaluation unavailable');
+        if (!cancelled) setSummary(data);
+      } catch (err) {
+        if (!cancelled) {
+          setSummary(null);
+          setError(getProblemMessage(err, 'Policy RAG evaluation unavailable.'));
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, []);
+
+  const risk = summary?.riskDetection;
+  const retrieval = summary?.retrievalRecall;
+  const uptake = summary?.constraintUptake;
+
+  return (
+    <section className="panel local-evaluation policy-rag-evaluation" aria-labelledby="policy-rag-eval-title">
+      <div className="section-heading">
+        <div><span className="eyebrow">RAG evaluation</span><h2 id="policy-rag-eval-title">Policy RAG evaluation</h2></div>
+        <Database aria-hidden="true" />
+      </div>
+      {loading ? <p className="panel-note dim-note">Loading...</p> : null}
+      {error ? <p className="error-text" role="alert">{error}</p> : null}
+      {summary ? (
+        <>
+          <p className="panel-note">
+            Evaluation corpus: {summary.corpus?.canonicalScenarios ?? 9} canonical adoption cases,
+            {' '}{summary.corpus?.curatedPolicyChunks ?? 37} curated policy chunks. Recall@5 requires the local Chroma sidecar.
+          </p>
+          <dl className="local-evaluation-grid">
+            <div><dt>Risk coverage</dt><dd>{risk?.passedScenarios ?? 0} / {risk?.totalScenarios ?? 0}</dd></div>
+            <div><dt>Risk labels</dt><dd>{formatPercent(risk?.labelCoverage)}</dd></div>
+            <div><dt>Recall@5</dt><dd>{retrieval?.available ? formatPercent(retrieval?.recallAt5) : 'Unavailable'}</dd></div>
+            <div><dt>Chunks hit</dt><dd>{retrieval?.matchedExpectedChunks ?? 0} / {retrieval?.expectedChunks ?? 0}</dd></div>
+            <div><dt>Uptake rate</dt><dd>{uptake?.available ? formatPercent(uptake?.uptakeRate) : '-'}</dd></div>
+            <div><dt>Pass outputs</dt><dd>{uptake?.passOutputs ?? 0} / {uptake?.outputsWithCompliance ?? 0}</dd></div>
+            <div><dt>Review outputs</dt><dd>{uptake?.reviewOutputs ?? 0}</dd></div>
+            <div><dt>Evaluated outputs</dt><dd>{uptake?.evaluatedOutputs ?? 0}</dd></div>
+          </dl>
+          {!retrieval?.available ? (
+            <p className="panel-note dim-note">Start <code>npm run rag:policy</code> or <code>npm run dev:rag</code>, then refresh this panel to compute Retrieval Recall@5.</p>
+          ) : null}
+          {!uptake?.available ? (
+            <p className="panel-note dim-note">Constraint uptake appears after running scenarios with the Policy RAG feature enabled.</p>
+          ) : null}
+          <details className="recommendation-evidence policy-eval-detail">
+            <summary>Evaluation details</summary>
+            <div className="policy-eval-detail-grid">
+              <div>
+                <span className="eyebrow">Risk misses</span>
+                <ul className="artifact-list">
+                  {(risk?.rows ?? []).filter((row) => !row.passed).slice(0, 6).map((row) => (
+                    <li key={row.scenarioId}>
+                      <strong>{row.title}</strong>: expected {row.expectedDomain}; detected {row.detectedDomain}.
+                      {row.missingRiskTypes?.length ? ` Missing risks: ${row.missingRiskTypes.join(', ')}.` : ''}
+                    </li>
+                  ))}
+                  {(risk?.rows ?? []).every((row) => row.passed) ? <li>All expected risk labels matched.</li> : null}
+                </ul>
+              </div>
+              <div>
+                <span className="eyebrow">Retrieval misses</span>
+                <ul className="artifact-list">
+                  {(retrieval?.rows ?? []).filter((row) => row.missingChunkIds?.length).slice(0, 6).map((row) => (
+                    <li key={row.scenarioId}>
+                      <strong>{row.title}</strong>: missing {row.missingChunkIds.join(', ')}.
+                    </li>
+                  ))}
+                  {(retrieval?.rows ?? []).length > 0 && (retrieval?.rows ?? []).every((row) => !row.missingChunkIds?.length) ? <li>All expected chunks appeared in top 5.</li> : null}
+                </ul>
+              </div>
+            </div>
+          </details>
+          <button className="control-btn secondary compact policy-eval-refresh" type="button" onClick={load} disabled={loading}>
+            {loading ? <Loader2 aria-hidden="true" className="spinner-icon" /> : <RefreshCcw aria-hidden="true" />} Refresh RAG evaluation
+          </button>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
 function ArtifactLinks({ run }) {
   return (
     <section className="panel artifact-links" aria-labelledby="art-title">
@@ -2559,11 +2674,12 @@ function App() {
     ) },
     { n: 4, title: 'Methodology',           body: <MethodologyDetails /> },
     { n: 5, title: 'Local evaluation summary', body: <LocalEvaluationPanel /> },
-    { n: 6, title: 'Q&A',                   body: <QAWidget selectedScenario={selectedScenario} currentRun={currentRun} /> },
-    { n: 7, title: 'Artifacts',             body: <ArtifactLinks run={currentRun} /> },
-    { n: 8, title: 'Run history',           body: <EvidenceLedger refreshKey={currentRun?.id ?? 'none'} /> },
-    { n: 9, title: 'Settings · OpenAI key', body: <UserKeySettings /> },
-    { n: 10, title: 'Diagnostics',          body: <DiagnosticsPanel /> },
+    { n: 6, title: 'Policy RAG evaluation', body: <PolicyRagEvaluationPanel /> },
+    { n: 7, title: 'Q&A',                   body: <QAWidget selectedScenario={selectedScenario} currentRun={currentRun} /> },
+    { n: 8, title: 'Artifacts',             body: <ArtifactLinks run={currentRun} /> },
+    { n: 9, title: 'Run history',           body: <EvidenceLedger refreshKey={currentRun?.id ?? 'none'} /> },
+    { n: 10, title: 'Settings · OpenAI key', body: <UserKeySettings /> },
+    { n: 11, title: 'Diagnostics',          body: <DiagnosticsPanel /> },
   ];
 
   return (

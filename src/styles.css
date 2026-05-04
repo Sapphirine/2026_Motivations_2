@@ -3315,9 +3315,37 @@ h3 {
   margin-top: 10px;
 }
 
+.policy-eval-detail {
+  margin-top: 14px;
+}
+
+.policy-eval-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 14px;
+}
+
+.policy-eval-detail-grid .artifact-list {
+  margin-top: 8px;
+}
+
+.policy-eval-detail-grid .artifact-list li {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.policy-eval-refresh {
+  margin-top: 12px;
+}
+
 @media (max-width: 780px) {
   .local-evaluation-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .policy-eval-detail-grid {
+    grid-template-columns: 1fr;
   }
 }
 

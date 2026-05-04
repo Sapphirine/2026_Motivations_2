@@ -41,6 +41,7 @@ import { runThreeLayerAnalysis } from './analysis/three-layer-runner';
 import { runGridBatches, startSensitivityGridJob } from './experiments/sensitivity-grid';
 import { startCanonicalBattery } from './experiments/canonical-battery';
 import { evaluateAdoptionReadiness, evaluateCanonicalBattery } from './experiments/adoption-evaluation';
+import { evaluatePolicyRag } from './experiments/policy-rag-evaluation';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -101,6 +102,7 @@ app.get('/', (c) => c.json({
     '/api/scenarios',
     '/api/value-profiles',
     '/api/rag/policy',
+    '/api/evaluations/policy-rag',
   ],
 }));
 
@@ -827,6 +829,10 @@ app.get('/api/evaluations/canonical-battery', async (c) => {
     ? await getGridJob(c.env, gridJobId)
     : await getGridJobByBatteryId(c.env, batteryId);
   return c.json(evaluateCanonicalBattery(runs, grid ?? null));
+});
+
+app.get('/api/evaluations/policy-rag', async (c) => {
+  return c.json(await evaluatePolicyRag(c.env));
 });
 
 function validationProblem(error: z.ZodError, instance: string): ProblemDetails {
