@@ -103,7 +103,7 @@ async function main() {
   console.log('[eval:local] running 20 same-profile baseline calls for the coding-assistant case');
   await runSameProfileBaseline(state, env, config.openAIModel, generationSettings);
 
-  console.log('[eval:local] running 144 low-vs-high axis contrast cells');
+  console.log('[eval:local] running 144 low-vs-high axis contrasts (288 endpoint calls)');
   await runSensitivityGrid(state, env, config.openAIModel, generationSettings);
 
   const runs = buildExperimentRuns(state, config.openAIModel, generationSettings);
@@ -515,7 +515,7 @@ function renderLatexResults(summary: any): string {
     `Divergent scenario rate & ${pct(summary.profileDivergence.divergentScenarioRate)} \\\\`,
     `Card complete output rate & ${pct(summary.interventionCardCompleteness.completeOutputRate)} \\\\`,
     `Three-layer audit coverage & ${summary.threeLayerAudit.auditedOutputs}/180 (${pct(summary.threeLayerAudit.auditCoverage)}) \\\\`,
-    `Sensitivity cells & ${summary.sensitivityGrid.completedCells}/144 (${pct(summary.sensitivityGrid.completionRate ?? 0)}) \\\\`,
+    `Sensitivity contrasts & ${summary.sensitivityGrid.completedCells}/144 (${pct(summary.sensitivityGrid.completionRate ?? 0)}) \\\\`,
     `Endpoint flip rate & ${pct(summary.sensitivityGrid.flipRate)} \\\\`,
     `Same-profile baseline & ${summary.sameProfileBaseline.completedCalls}/20; average modal stability ${pct(summary.sameProfileBaseline.averageModalStability)} \\\\`,
     '\\bottomrule',
@@ -529,7 +529,7 @@ function renderLatexResults(summary: any): string {
 function printSummary(summary: any) {
   console.log('[eval:local] complete');
   console.log(`[eval:local] subject outputs: ${summary.battery.subjectOutputs}/180`);
-  console.log(`[eval:local] grid cells: ${summary.sensitivityGrid.completedCells}/144`);
+  console.log(`[eval:local] grid contrasts: ${summary.sensitivityGrid.completedCells}/144`);
   console.log(`[eval:local] average modal stability: ${pct(summary.stability.averageModalStability)}`);
   console.log(`[eval:local] endpoint flip rate: ${pct(summary.sensitivityGrid.flipRate)}`);
   console.log(`[eval:local] wrote ${SUMMARY_PATH}`);

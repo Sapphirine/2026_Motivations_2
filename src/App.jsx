@@ -72,7 +72,7 @@ const tabs = [
     subtitle: 'Watch four motivated agents recommend interventions for the same adoption case.' },
   { id: 'three-layer', label: 'Three-Layer Analysis', detail: 'Declared · chosen · justified',
     subtitle: 'How declared, chosen, and justified intervention motivations agree or disagree.' },
-  { id: 'boundary',    label: 'Boundary Map',         detail: '144-cell intervention sensitivity grid',
+  { id: 'boundary',    label: 'Boundary Map',         detail: '144 contrasts - 288 endpoint calls',
     subtitle: 'Which motivation weight actually changes the recommended intervention.' },
   { id: 'method',      label: 'Method / Report',      detail: 'Purpose · methodology · Q&A · evidence',
     subtitle: 'How the experiment is set up, and how to read the result.' },
@@ -361,7 +361,7 @@ function CanonicalBatteryCTA({ onRun, batteryState }) {
         <Activity aria-hidden="true" />
       </div>
       <p className="panel-note">
-        9 adoption cases × 4 profiles × 5 trials + 20-call same-profile baseline + 144 low-vs-high sensitivity cells + 9 moderator calls.
+        9 adoption cases × 4 profiles × 5 trials + 20-call same-profile baseline + 144 low-vs-high sensitivity contrasts (288 endpoint calls) + 9 moderator calls.
         Approximately <strong>~497 live OpenAI calls</strong>; budget before running and expect <strong>~10-20 min</strong> wall clock.
         Idempotent - re-running with the same key resumes pending cells.
       </p>
@@ -675,7 +675,7 @@ function BoundaryMapPanel({ heatmap, jobState, loading, onRefresh, onRunGrid, on
       <div className="section-heading">
         <div>
           <span className="eyebrow">Sensitivity grid</span>
-          <h2 id="boundary-title">144-cell axis-weight load-bearing heatmap</h2>
+          <h2 id="boundary-title">144-contrast axis-weight load-bearing heatmap</h2>
         </div>
         <Grid3x3 aria-hidden="true" />
       </div>
@@ -721,8 +721,8 @@ function BoundaryMapPanel({ heatmap, jobState, loading, onRefresh, onRunGrid, on
       {jobState?.error ? <p className="error-text" role="alert">Error: {jobState.error}</p> : null}
       {hasNoGridData ? (
         <div className="heatmap-empty-state" role="status">
-          <strong>{isGridRunning ? 'Boundary Map is running' : 'No sensitivity cells yet'}</strong>
-          <p>{isGridRunning ? 'The 144-cell grid has started. Results will appear after cells complete.' : 'Run the 144-cell grid, then check status if the job was already started elsewhere.'}</p>
+          <strong>{isGridRunning ? 'Boundary Map is running' : 'No sensitivity contrasts yet'}</strong>
+          <p>{isGridRunning ? 'The 144-contrast grid has started. It runs 288 endpoint calls, and results appear as contrasts complete.' : 'Run the 144-contrast grid, then check status if the job was already started elsewhere.'}</p>
           <div className="heatmap-empty-actions">
             {canRetryFailedCells ? (
               <button type="button" className="control-btn primary compact" onClick={onRetryFailed} disabled={isGridRunning}>{isRetryingFailedCells ? 'Retrying failed cells...' : 'Retry failed cells'}</button>
@@ -761,7 +761,7 @@ function BoundaryMapPanel({ heatmap, jobState, loading, onRefresh, onRunGrid, on
             <p className="heatmap-explainer-hint">Click any cell for the low-vs-high intervention pair.</p>
           </>
         ) : (
-          <p className="heatmap-explainer-hint">Waiting for sensitivity cells. Progress can be checked above while the 144-cell grid is pending.</p>
+          <p className="heatmap-explainer-hint">Waiting for sensitivity contrasts. Progress can be checked above while the 144-contrast grid is pending.</p>
         )}
       </aside>
       {hasColoredCells ? (
@@ -873,7 +873,7 @@ function MethodologyDetails() {
       </details>
 
       <details>
-        <summary>Sensitivity grid (144 cells)</summary>
+        <summary>Sensitivity grid (144 contrasts, 288 endpoint calls)</summary>
         <p>
           For each (adoption case × profile × axis), hold all non-target axes fixed, set the target axis
           to low (<code>0.2</code>) and high (<code>0.8</code>), and run one <code>{ACTIVE_MODEL}</code>
@@ -949,7 +949,7 @@ function LocalEvaluationPanel() {
           <dl className="local-evaluation-grid">
             <div><dt>Mode</dt><dd>{mode}</dd></div>
             <div><dt>Subject outputs</dt><dd>{summary.battery?.subjectOutputs ?? 0} / 180</dd></div>
-            <div><dt>Grid cells</dt><dd>{summary.sensitivityGrid?.completedCells ?? 0} / 144</dd></div>
+            <div><dt>Grid contrasts</dt><dd>{summary.sensitivityGrid?.completedCells ?? 0} / 144</dd></div>
             <div><dt>Audit coverage</dt><dd>{formatPercent(summary.threeLayerAudit?.auditCoverage)}</dd></div>
             <div><dt>Modal stability</dt><dd>{formatPercent(summary.stability?.averageModalStability)}</dd></div>
             <div><dt>Divergent cases</dt><dd>{formatPercent(summary.profileDivergence?.divergentScenarioRate)}</dd></div>
@@ -1719,7 +1719,7 @@ function App() {
   const boundarySteps = [
     {
       n: 1,
-      title: 'Inspect the 144-cell heatmap',
+      title: 'Inspect the 144-contrast heatmap',
       body: (
         <BoundaryMapPanel
           heatmap={heatmap}

@@ -16,7 +16,7 @@ const ITEMS = [
     Icon: Microscope,
     eyebrow: 'Purpose',
     title: 'Can motivation-aware interventions turn AI training into actual AI usage?',
-    body: 'Three-layer triangulation across declared motivation, recommended adoption intervention, and justification, plus a 144-cell sensitivity heatmap.',
+    body: 'Three-layer triangulation across declared motivation, recommended adoption intervention, and justification, plus a 144-contrast sensitivity heatmap.',
   },
   {
     Icon: Users,

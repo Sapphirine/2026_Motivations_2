@@ -79,8 +79,9 @@ The app still uses the same experiment shape:
 4. Judge the chosen intervention with a separate model.
 5. Extract the rationale motivation.
 6. Classify L1/L2/L3 alignment.
-7. Run a 144-cell sensitivity grid to find load-bearing motivation axes. Each
-   cell compares low (`0.2`) versus high (`0.8`) settings for one target axis.
+7. Run a 144-contrast sensitivity grid to find load-bearing motivation axes.
+   Each contrast compares low (`0.2`) versus high (`0.8`) settings for one
+   target axis, so the grid uses 288 endpoint calls.
 
 ## Behavioral Intervention Playbook
 
@@ -152,7 +153,7 @@ Classification: Aligned.
 - `src/judges/value-judge.ts` - L2 intervention motivation judge.
 - `src/extractors/rationale-values.ts` - L3 rationale motivation extractor.
 - `src/experiments/canonical-battery.ts` - 9-case canonical battery runner.
-- `src/experiments/sensitivity-grid.ts` - 144-cell load-bearing heatmap runner.
+- `src/experiments/sensitivity-grid.ts` - 144-contrast load-bearing heatmap runner.
 - `src/App.jsx` and `src/ui/` - 5-tab research UI.
 - `final_program_tex/final_project.tex` - final report source outside this
   Vite app directory.
@@ -225,7 +226,7 @@ The paper-grade evaluation path is the canonical battery:
 
 - 9 adoption cases x 4 profiles x 5 trials = 180 subject-model outputs.
 - 20 same-profile baseline calls for the coding-assistant case.
-- 144 sensitivity-grid cells. Each cell runs two endpoint calls for one target
+- 144 sensitivity-grid contrasts. Each contrast runs two endpoint calls for one target
   axis, setting it low (`0.2`) and high (`0.8`) while holding other axes fixed.
 - L1/L2/L3 audit for the 180 subject outputs.
 
@@ -321,7 +322,7 @@ The local runner completed the paper-grade live OpenAI evaluation with
 
 - 180/180 subject-model outputs.
 - 20/20 same-profile baseline calls.
-- 144/144 sensitivity-grid low-vs-high contrast cells with 0 grid errors.
+- 144/144 sensitivity-grid low-vs-high contrasts with 0 grid errors.
 - Average modal stability: `86.1%`.
 - Divergent scenario rate: `44.4%`.
 - Intervention-card complete output rate: `100.0%`.
@@ -354,7 +355,7 @@ It should prove that MotiveOps is doing adoption-specific work:
   1.00`.
 - **Canonical sensitivity battery**: `npm run eval:local` reports subject
   completion, profile-cell modal stability, profile divergence, three-layer
-  audit coverage, same-profile baseline stability, and the 144-cell endpoint
+  audit coverage, same-profile baseline stability, and the 144-contrast endpoint
   flip rate. Rerun the live evaluation after grid-method changes
   before reporting final values.
 - **Bad advice detection**: the regression fixture marks "Use AI for all coding

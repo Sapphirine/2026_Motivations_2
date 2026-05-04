@@ -68,7 +68,7 @@ export default function BoundaryHeatmap({
   const cellMap = useMemo(() => buildLookup(cells), [cells]);
 
   if (!Array.isArray(scenarios) || scenarios.length === 0 || !Array.isArray(profiles) || !Array.isArray(axes) || !Array.isArray(cells) || cells.length === 0) {
-    return <p className="dim-note" role="status">Boundary Map pending. No sensitivity cells are available yet.</p>;
+    return <p className="dim-note" role="status">Boundary Map pending. No sensitivity contrasts are available yet.</p>;
   }
 
   const profileBlockWidth = axes.length * CELL_SIZE + (axes.length - 1) * CELL_GAP;
