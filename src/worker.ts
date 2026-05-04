@@ -23,6 +23,7 @@ import {
   getCanonicalHeatmapGridJob,
   getD1Mode,
   getGridJob,
+  getGridJobByBatteryId,
   getRun,
   getRunAuthoritative,
   getScenario,
@@ -38,7 +39,7 @@ import { getConfig } from './services/config';
 import { runThreeLayerAnalysis } from './analysis/three-layer-runner';
 import { runGridBatches, runGridErrorRetries, startSensitivityGridJob } from './experiments/sensitivity-grid';
 import { startCanonicalBattery } from './experiments/canonical-battery';
-import { evaluateAdoptionReadiness } from './experiments/adoption-evaluation';
+import { evaluateAdoptionReadiness, evaluateCanonicalBattery } from './experiments/adoption-evaluation';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -782,6 +783,22 @@ app.get('/api/evaluations/adoption-readiness', async (c) => {
   const run = runId ? await getRunAuthoritative(c.env, runId, { hydrateOutputs: true }) : null;
   if (runId && !run) return c.json(problem(404, 'Run not found', 'The requested experiment run does not exist.', c.req.path), 404);
   return c.json(evaluateAdoptionReadiness(run ?? null));
+});
+
+app.get('/api/evaluations/canonical-battery', async (c) => {
+  const batteryId = c.req.query('batteryId');
+  const gridJobId = c.req.query('gridJobId');
+  if (!batteryId) {
+    return c.json(problem(400, 'Missing batteryId', 'Provide ?batteryId=<battery-id> from POST /api/research/run-canonical-battery.', c.req.path), 400);
+  }
+  const summaries = await listRecentRunsFromD1(c.env, 100, batteryId);
+  const runs = (await Promise.all(
+    summaries.map((summary) => getRunAuthoritative(c.env, summary.runId, { hydrateOutputs: true })),
+  )).filter((run): run is NonNullable<typeof run> => Boolean(run));
+  const grid = gridJobId
+    ? await getGridJob(c.env, gridJobId)
+    : await getGridJobByBatteryId(c.env, batteryId);
+  return c.json(evaluateCanonicalBattery(runs, grid ?? null));
 });
 
 function validationProblem(error: z.ZodError, instance: string): ProblemDetails {

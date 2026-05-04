@@ -218,6 +218,77 @@ npm run typecheck
 npm run build
 ```
 
+## Full evaluation run locally
+
+The paper-grade evaluation path is the canonical battery:
+
+- 9 adoption cases x 4 profiles x 5 trials = 180 subject-model outputs.
+- 20 same-profile baseline calls for the coding-assistant case.
+- 144 sensitivity-grid cells, one weakened motivation axis per case/profile.
+- L1/L2/L3 audit for the 180 subject outputs.
+
+This repo now has a standalone local runner, so you do not need the remote
+Cloudflare URL or hosted D1/KV/R2 bindings for the paper evaluation. The runner
+reads `.dev.vars`, calls OpenAI directly from Node when `DEMO_MODE=false`, and
+writes the summary files used by the local website and paper.
+
+For paper-grade numbers, put your key in `.dev.vars`:
+
+```bash
+DEMO_MODE=false
+OPENAI_API_KEY=sk-...
+```
+
+Then run:
+
+```bash
+npm run eval:local -- --reset
+```
+
+If the key is already available as a shell environment variable and you do not
+want to edit `.dev.vars`, use:
+
+```bash
+npm run eval:local -- --reset --live
+```
+
+The command is resumable. If it stops partway through, run `npm run eval:local`
+again without `--reset` and it will keep completed cells from the raw local
+state.
+
+Generated artifacts:
+
+- `evaluation-results/local-canonical-evaluation.raw.json` - full local run state.
+- `evaluation-results/local-canonical-evaluation.summary.json` - paper-ready metrics.
+- `public/evaluation/latest-local-evaluation.json` - loaded by the Method / Report tab.
+- `final_program_tex/local_eval_results.tex` - included by `final_project.tex`.
+
+For a deterministic smoke test, keep `.dev.vars` in demo mode and pass
+`--demo` explicitly:
+
+```bash
+npm run eval:local -- --reset --demo
+```
+
+Without `--demo`, the runner refuses to produce a paper table while
+`DEMO_MODE=true`; this prevents accidentally submitting demo numbers as live
+OpenAI evaluation results.
+
+After a live local evaluation, rebuild the report PDF:
+
+```bash
+cd final_program_tex
+pdflatex final_project.tex
+pdflatex final_project.tex
+```
+
+To view the summary in the frontend, start the local app and open the
+Method / Report tab:
+
+```bash
+npm run dev:all
+```
+
 ## API surface
 
 The route names still use `scenario` and `decision` in a few data contracts for
@@ -238,32 +309,28 @@ intervention choices.
 - `GET /api/evidence-ledger`
 - `GET /api/artifacts/:runId`
 - `POST /api/questions/answer`
+- `GET /api/evaluations/adoption-readiness`
+- `GET /api/evaluations/canonical-battery?batteryId=<battery-id>`
 
-## Production verification
+## Local verification status
 
-Production URL:
+The local runner completed the paper-grade live OpenAI evaluation with
+`DEMO_MODE=false` and `OPENAI_MODEL=gpt-5.4-nano`:
 
-```text
-https://motiveops-api-production.blueredian.workers.dev
-```
+- 180/180 subject-model outputs.
+- 20/20 same-profile baseline calls.
+- 144/144 sensitivity-grid perturbation cells with 0 grid errors.
+- Average modal stability: `86.1%`.
+- Divergent scenario rate: `44.4%`.
+- Intervention-card complete output rate: `100.0%`.
+- Three-layer audit coverage: `180/180`.
+- Sensitivity flip rate: `23.6%`.
+- Same-profile baseline average modal stability: `90.0%`.
 
-Latest deployment is configured with `DEMO_MODE=false` and a Cloudflare Worker
-`OPENAI_API_KEY` secret. Diagnostics confirm D1, KV, and R2 bindings are
-healthy.
-
-After the OpenAI billing/quota issue was fixed, live OpenAI verification
-succeeded:
-
-- `POST /api/questions/answer` returned `mode=openai`.
-- `POST /api/experiments/run` returned HTTP `200`, `status=completed`, and
-  4/4 profile outputs for run `run_db266deecdfe4499`.
-- Achievement and Preservation selected `option_b` (10-minute unit-test-name
-  experiment).
-- Exploration selected `option_d` (choose-your-own support-task sandbox).
-- Neutral selected `option_c` (manager-safe accountability statement).
-- Synthesis reported substantive divergence with divergence metric `0.6667`.
-- Three-layer audit distribution: 1 Aligned, 1 Rationalizing, 1 Drifting, and
-  1 Contradictory.
+The generated live summary is in
+`evaluation-results/local-canonical-evaluation.summary.json`, the frontend reads
+`public/evaluation/latest-local-evaluation.json`, and the report includes
+`final_program_tex/local_eval_results.tex`.
 
 ## Evaluation plan and current evidence
 
@@ -274,11 +341,17 @@ It should prove that MotiveOps is doing adoption-specific work:
   expected blocker-policy ids and check whether retrieval returns them. The
   current deterministic fixture reports Top-1 accuracy `9/9 = 1.00` and Top-3
   expected-policy coverage `20/26 = 0.769`.
-- **Intervention card completeness**: every generated output is now expected to
+- **Intervention card completeness**: every generated output is expected to
   include `diagnosedBlocker`, `motivationProfile`, `retrievedStrategy`,
   `microAction`, `ifThenPlan`, `accountabilityScript`, and `successMetric`.
-  The latest live run reports field completeness `1.00` and complete-output
-  rate `4/4 = 1.00`.
+  The live local canonical summary reports complete-output rate `180/180 =
+  1.00`.
+- **Canonical sensitivity battery**: `npm run eval:local` reports subject
+  completion, profile-cell modal stability, profile divergence, three-layer
+  audit coverage, same-profile baseline stability, and the 144-cell sensitivity
+  flip rate. Current live values are `86.1%` average modal stability, `44.4%`
+  divergent scenario rate, `100.0%` audit coverage, `90.0%` same-profile
+  baseline stability, and `23.6%` sensitivity flip rate.
 - **Bad advice detection**: the regression fixture marks "Use AI for all coding
   tasks this week to maximize productivity" as `Contradictory` for the
   low-trust/security-anxiety case.
@@ -286,10 +359,12 @@ It should prove that MotiveOps is doing adoption-specific work:
   measured with 20-30 hand-labeled outputs before reporting human-label
   agreement against L1/L2/L3.
 
-Endpoint:
+Local summary files:
 
 ```text
-GET /api/evaluations/adoption-readiness?runId=<optional-run-id>
+evaluation-results/local-canonical-evaluation.summary.json
+public/evaluation/latest-local-evaluation.json
+final_program_tex/local_eval_results.tex
 ```
 
 ## Business framing

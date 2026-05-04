@@ -473,13 +473,33 @@ function selectMockOption(scenario: Scenario, profile: ValueProfile) {
 }
 
 function parseStructuredDecision(rawOutput: string): StructuredDecision {
+  const jsonText = extractJsonObject(rawOutput);
+  const candidates = [rawOutput, jsonText, repairMissingCommas(jsonText)];
   try {
-    return JSON.parse(rawOutput) as StructuredDecision;
-  } catch {
-    const match = rawOutput.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('OpenAI response did not contain JSON.');
-    return JSON.parse(match[0]) as StructuredDecision;
+    return JSON.parse(candidates[0]) as StructuredDecision;
+  } catch (firstError) {
+    for (const candidate of candidates.slice(1)) {
+      try {
+        return JSON.parse(candidate) as StructuredDecision;
+      } catch {
+        // Try the next candidate.
+      }
+    }
+    throw firstError;
   }
+}
+
+function extractJsonObject(rawOutput: string): string {
+  const trimmed = rawOutput.replace(/```json|```/gi, '').trim();
+  const match = trimmed.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('OpenAI response did not contain JSON.');
+  return match[0];
+}
+
+function repairMissingCommas(jsonText: string): string {
+  return jsonText
+    .replace(/}\s*(?={)/g, '},')
+    .replace(/([}\]"0-9]|true|false|null)([ \t\r]*\n[ \t]*)(?=("|[{]))/g, '$1,$2');
 }
 
 function normalizeDecision(decision: StructuredDecision, scenario: Scenario, profile: ValueProfile): StructuredDecision {

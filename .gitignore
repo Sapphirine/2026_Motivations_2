@@ -8,6 +8,8 @@ dist/
 
 # Research-grade intermediate dumps (canonical evidence is served from R2).
 research-data/
+evaluation-results/
+public/evaluation/latest-local-evaluation.json
 
 # Internal planning artifacts — not part of the published deliverable.
 01-spec.md

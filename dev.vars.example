@@ -10,5 +10,6 @@ ARTIFACT_MAX_BYTES=500000
 ARTIFACT_RETENTION_DAYS=14
 DEMO_MODE=true
 
-# Secret, set with `npx wrangler secret put OPENAI_API_KEY` or local secret handling.
+# Local live OpenAI/evaluation secret. Copy this file to .dev.vars, set
+# DEMO_MODE=false, and fill this value. .dev.vars is gitignored.
 # OPENAI_API_KEY=

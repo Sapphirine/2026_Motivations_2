@@ -2878,25 +2878,25 @@ h3 {
   padding-left: 18px;
 }
 
-.live-verification {
+.local-evaluation {
   padding: 22px;
 }
 
-.live-verification-grid {
+.local-evaluation-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin: 14px 0 0;
 }
 
-.live-verification-grid div {
+.local-evaluation-grid div {
   border: 1px solid #d8d2c8;
   border-radius: 10px;
   background: #fffcf6;
   padding: 10px 12px;
 }
 
-.live-verification-grid dt {
+.local-evaluation-grid dt {
   margin: 0 0 4px;
   color: #676b73;
   font-size: 11px;
@@ -2904,19 +2904,19 @@ h3 {
   text-transform: uppercase;
 }
 
-.live-verification-grid dd {
+.local-evaluation-grid dd {
   margin: 0;
   color: #232323;
   font-size: 16px;
   font-weight: 900;
 }
 
-.live-verification-list {
+.local-evaluation-list {
   margin-top: 10px;
 }
 
 @media (max-width: 780px) {
-  .live-verification-grid {
+  .local-evaluation-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

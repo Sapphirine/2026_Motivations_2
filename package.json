@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "test": "tsc --noEmit",
+    "eval:local": "esbuild scripts/run-local-evaluation.ts --bundle --platform=node --format=esm --outfile=.wrangler/tmp/run-local-evaluation.mjs && node .wrangler/tmp/run-local-evaluation.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "deploy": "wrangler deploy"
   },

@@ -1113,6 +1113,20 @@ export async function getGridJobByIdempotencyKey(env: Env, key: string): Promise
   return row ? hydrateGridJobRow(row) : undefined;
 }
 
+export async function getGridJobByBatteryId(env: Env, batteryId: string): Promise<SensitivityGridJob | undefined> {
+  if (!env.DB || unavailableD1.has(env.DB)) return undefined;
+  const row = await tryFirst(() => env.DB!.prepare(`
+    SELECT id, battery_id, status, total_cells, completed_cells, failed_cells, error_budget,
+      scenario_ids_json, profile_ids_json, axis_ids_json, results_json, errors_json,
+      idempotency_key, created_at, updated_at, completed_at
+    FROM sensitivity_grid_jobs
+    WHERE battery_id = ?
+    ORDER BY created_at DESC
+    LIMIT 1
+  `).bind(batteryId).first<GridJobRow>(), env.DB);
+  return row ? hydrateGridJobRow(row) : undefined;
+}
+
 /**
  * Fetch the most recent completed-or-partial grid job (used by
  * GET /api/findings/heatmap). Returns undefined if no job has reached a

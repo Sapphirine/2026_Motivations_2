@@ -810,34 +810,70 @@ function MethodologyDetails() {
   );
 }
 
-function LiveVerificationPanel() {
+function formatPercent(value) {
+  return Number.isFinite(value) ? `${(value * 100).toFixed(1)}%` : '-';
+}
+
+function LocalEvaluationPanel() {
+  const [summary, setSummary] = useState(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const response = await fetch('/evaluation/latest-local-evaluation.json', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        if (!cancelled) setSummary(data);
+      } catch {
+        if (!cancelled) setError('No local evaluation summary found.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const mode = summary?.localRun?.mode ?? '-';
+  const isDemo = mode === 'demo';
+
   return (
-    <section className="panel live-verification" aria-labelledby="live-verify-title">
+    <section className="panel local-evaluation" aria-labelledby="local-eval-title">
       <div className="section-heading">
-        <div><span className="eyebrow">Production evidence</span><h2 id="live-verify-title">Latest live OpenAI run</h2></div>
+        <div><span className="eyebrow">Local evidence</span><h2 id="local-eval-title">Canonical evaluation summary</h2></div>
         <BarChart3 aria-hidden="true" />
       </div>
-      <p className="panel-note">
-        Cloudflare production is running with <code>DEMO_MODE=false</code>. After billing/quota was restored,
-        the deployed API completed run <code>run_db266deecdfe4499</code> with 4/4 live profile outputs.
-      </p>
-      <dl className="live-verification-grid">
-        <div><dt>Q&amp;A mode</dt><dd>openai</dd></div>
-        <div><dt>Run status</dt><dd>completed</dd></div>
-        <div><dt>Outputs</dt><dd>4 / 4</dd></div>
-        <div><dt>Divergence</dt><dd>0.6667</dd></div>
-      </dl>
-      <ul className="artifact-list live-verification-list">
-        <li><strong>Achievement + Preservation</strong>: <code>option_b</code>, 10-minute unit-test-name experiment.</li>
-        <li><strong>Exploration</strong>: <code>option_d</code>, choose-your-own support-task sandbox.</li>
-        <li><strong>Neutral</strong>: <code>option_c</code>, manager-safe accountability statement.</li>
-        <li><strong>L1/L2/L3 audit</strong>: 1 Aligned, 1 Rationalizing, 1 Drifting, 1 Contradictory.</li>
-      </ul>
-      <p className="panel-note">
-        The added evaluation layer checks playbook retrieval, card completeness, and bad-advice detection.
-        Static retrieval currently hits the expected blocker policy at Top-1 for 9/9 cases and covers
-        20/26 expected policies in Top-3. The latest live run has complete intervention-card fields for 4/4 outputs.
-      </p>
+      {loading ? <p className="panel-note dim-note">Loading...</p> : null}
+      {!loading && error ? (
+        <p className="panel-note">
+          {error} Run <code>npm run eval:local</code> to populate <code>public/evaluation/latest-local-evaluation.json</code>.
+        </p>
+      ) : null}
+      {summary ? (
+        <>
+          <p className="panel-note">
+            Source: <code>{summary.localRun?.publicSummaryPath ?? 'public/evaluation/latest-local-evaluation.json'}</code>.
+            {isDemo ? ' Current file is a demo-mode smoke result, not the paid OpenAI evaluation.' : ' Current file was produced by a local OpenAI evaluation run.'}
+          </p>
+          <dl className="local-evaluation-grid">
+            <div><dt>Mode</dt><dd>{mode}</dd></div>
+            <div><dt>Subject outputs</dt><dd>{summary.battery?.subjectOutputs ?? 0} / 180</dd></div>
+            <div><dt>Grid cells</dt><dd>{summary.sensitivityGrid?.completedCells ?? 0} / 144</dd></div>
+            <div><dt>Audit coverage</dt><dd>{formatPercent(summary.threeLayerAudit?.auditCoverage)}</dd></div>
+            <div><dt>Modal stability</dt><dd>{formatPercent(summary.stability?.averageModalStability)}</dd></div>
+            <div><dt>Divergent cases</dt><dd>{formatPercent(summary.profileDivergence?.divergentScenarioRate)}</dd></div>
+            <div><dt>Card complete</dt><dd>{formatPercent(summary.interventionCardCompleteness?.completeOutputRate)}</dd></div>
+            <div><dt>Flip rate</dt><dd>{formatPercent(summary.sensitivityGrid?.flipRate)}</dd></div>
+          </dl>
+          <ul className="artifact-list local-evaluation-list">
+            <li><strong>Same-profile baseline</strong>: {summary.sameProfileBaseline?.completedCalls ?? 0}/20 calls, average modal stability {formatPercent(summary.sameProfileBaseline?.averageModalStability)}.</li>
+            <li><strong>Generated table</strong>: <code>final_program_tex/local_eval_results.tex</code> is included by the paper.</li>
+          </ul>
+        </>
+      ) : null}
     </section>
   );
 }
@@ -976,10 +1012,15 @@ function DiagnosticsPanel() {
     return () => { cancelled = true; };
   }, []);
 
-  const env = diag?.env ?? {};
-  const bindings = diag?.bindings ?? {};
+  const env = diag?.env ?? { APP_ENV: diag?.appEnv, DEMO_MODE: diag?.demoMode };
+  const rawBindings = diag?.bindings ?? {};
+  const bindings = {
+    d1: typeof rawBindings.d1 === 'object' ? rawBindings.d1?.configured : rawBindings.d1,
+    kv: typeof rawBindings.kv === 'object' ? rawBindings.kv?.configured : rawBindings.kv,
+    r2: typeof rawBindings.r2 === 'object' ? rawBindings.r2?.configured : rawBindings.r2,
+  };
   const features = diag?.features ?? {};
-  const openai = diag?.openai ?? {};
+  const openai = diag?.openai ?? { configured: diag?.openaiKeyConfigured };
 
   return (
     <section className="panel diag-card" aria-labelledby="diag-title">
@@ -1631,7 +1672,7 @@ function App() {
   const methodSteps = [
     { n: 1, title: 'Purpose at a glance',  body: <PurposeCallout /> },
     { n: 2, title: 'Methodology',           body: <MethodologyDetails /> },
-    { n: 3, title: 'Live production verification', body: <LiveVerificationPanel /> },
+    { n: 3, title: 'Local evaluation summary', body: <LocalEvaluationPanel /> },
     { n: 4, title: 'Q&A',                   body: <QAWidget selectedScenario={selectedScenario} currentRun={currentRun} /> },
     { n: 5, title: 'Artifacts and PDF',     body: <ArtifactLinks run={currentRun} /> },
     { n: 6, title: 'Run history',           body: <EvidenceLedger refreshKey={currentRun?.id ?? 'none'} /> },

@@ -25,6 +25,7 @@
 
 import { presetScenarios } from '../domain/seeds';
 import type { Env, ProfileId, SameProfileBaselineRun } from '../domain/types';
+import { runThreeLayerAnalysis } from '../analysis/three-layer-runner';
 import { runExperiment } from '../services/experiment';
 import { runProfileProvider } from '../services/provider';
 import {
@@ -61,7 +62,7 @@ const TRIAL_COUNT = 5;
  *   record `flipped: null`.
  *
  *   The new flow chains under a single `waitUntil`:
- *     1. await Promise.all(main 9 runs)      // experiment_runs reach terminal
+ *     1. await sequential main 9 runs        // experiment_runs reach terminal
  *     2. await Promise.all(20 baseline trials)
  *     3. INSERT sensitivity_grid_jobs THEN runGridBatches
  *
@@ -107,24 +108,29 @@ export async function startCanonicalBattery(
   // the grid against the main battery caused every cell to see "no
   // baseline" and record `flipped: null` (Lane C bug report).
   waitUntil((async () => {
-    // ===== Stage 1: main battery (9 runs in parallel, await all) =====
-    const mainPromises = scenarios.map((scenario) => {
+    // ===== Stage 1: main battery (9 runs, sequential by scenario) =====
+    // Each run still fans out 4 profiles x 5 trials internally. Running the
+    // nine scenarios sequentially avoids a 180-call subject-model burst.
+    for (const scenario of scenarios) {
       const runIdempotencyKey = `${idempotencyKey}::${scenario.id}`;
-      return runExperiment(env, {
-        scenarioId: scenario.id,
-        profileIds: [...ALL_PROFILES],
-        trialCount: TRIAL_COUNT,
-        idempotencyKey: runIdempotencyKey,
-        batteryId,
-      }, '/api/research/run-canonical-battery', userKey).then((run) => {
+      try {
+        const run = await runExperiment(env, {
+          scenarioId: scenario.id,
+          profileIds: [...ALL_PROFILES],
+          trialCount: TRIAL_COUNT,
+          idempotencyKey: runIdempotencyKey,
+          batteryId,
+        }, '/api/research/run-canonical-battery', userKey);
         console.info('[battery] main run complete', { runId: run.id, scenario: scenario.id, status: run.status });
-        return run;
-      }).catch((error) => {
+        try {
+          await runThreeLayerAnalysis(env, run.id, { force: false }, userKey);
+        } catch (error) {
+          console.error('[battery] three-layer audit failed', { runId: run.id, scenario: scenario.id, error: error instanceof Error ? error.message : String(error) });
+        }
+      } catch (error) {
         console.error('[battery] main run failed', { scenario: scenario.id, error: error instanceof Error ? error.message : String(error) });
-        return null;
-      });
-    });
-    await Promise.all(mainPromises);
+      }
+    }
 
     // ===== Stage 2: same-profile baseline (20 trials in parallel) =====
     let baselineCursor = 0;
