@@ -37,7 +37,7 @@ import {
 } from './services/storage';
 import { getConfig } from './services/config';
 import { runThreeLayerAnalysis } from './analysis/three-layer-runner';
-import { runGridBatches, runGridErrorRetries, startSensitivityGridJob } from './experiments/sensitivity-grid';
+import { runGridBatches, startSensitivityGridJob } from './experiments/sensitivity-grid';
 import { startCanonicalBattery } from './experiments/canonical-battery';
 import { evaluateAdoptionReadiness, evaluateCanonicalBattery } from './experiments/adoption-evaluation';
 
@@ -463,31 +463,19 @@ app.post('/api/sensitivity-grid/:jobId/retry-failed', rateLimit('sensitivity-gri
   const retryErrors = requested
     ? job.errors.filter((error) => requested.has(gridCellKey(error.scenarioId, error.profileId, error.axisId)))
     : [...job.errors];
+  const retryKeys = new Set(retryErrors.map((error) => gridCellKey(error.scenarioId, error.profileId, error.axisId)));
 
-  if (retryErrors.length === 0) {
-    return c.json({
-      jobId: job.id,
-      status: job.status,
-      retriedCells: 0,
-      failedCells: job.failedCells,
-      completedCells: job.completedCells,
-      totalCells: job.totalCells,
-      errors: job.errors,
-    }, 202);
+  if (retryKeys.size > 0) {
+    job.errors = job.errors.filter((error) => !retryKeys.has(gridCellKey(error.scenarioId, error.profileId, error.axisId)));
+    job.failedCells = job.errors.length;
   }
-
   job.status = 'pending';
   job.completedAt = undefined;
   job.updatedAt = nowSeconds();
   await updateGridJob(c.env, job);
 
-  const retryCells = retryErrors.map((error) => ({
-    scenarioId: error.scenarioId,
-    profileId: error.profileId as 'achievement' | 'exploration' | 'preservation' | 'neutral',
-    axisId: error.axisId as 'achievement' | 'self_direction' | 'security' | 'benevolence',
-  }));
   const userKey = sanitizeUserKey(c.req.header('x-openai-key'));
-  c.executionCtx.waitUntil(runGridErrorRetries(c.env, job.id, retryCells, userKey).catch((error) => {
+  c.executionCtx.waitUntil(runGridBatches(c.env, job.id, userKey).catch((error) => {
     console.warn('[sensitivity-grid] retry-failed waitUntil failed:', error instanceof Error ? error.message : error);
   }));
 
@@ -499,6 +487,7 @@ app.post('/api/sensitivity-grid/:jobId/retry-failed', rateLimit('sensitivity-gri
     completedCells: job.completedCells,
     totalCells: job.totalCells,
     errors: job.errors,
+    resumedCells: Math.max(0, job.totalCells - job.completedCells - job.failedCells),
   }, 202);
 });
 

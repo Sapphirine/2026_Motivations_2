@@ -582,12 +582,14 @@ function BoundaryMapPanel({ heatmap, jobState, loading, onRefresh, onRunGrid, on
   const totalCells = Math.max(1, Number(jobState?.totalCells ?? heatmap?.totalCells ?? 144));
   const failedCells = Math.max(0, Number(jobState?.failedCells ?? heatmap?.failedCells ?? 0));
   const hasIncompleteCells = cellCount > 0 && cellCount < totalCells;
-  const canRetryFailedCells = Boolean(activeJobId) && (failedCells > 0 || status === 'partial' || status === 'failed');
-  const canCheckPartialJob = Boolean(activeJobId) && !canRetryFailedCells && hasIncompleteCells;
+  const isIncompleteTerminalJob = Boolean(activeJobId) && !isGridRunning && completedCells < totalCells && (status === 'partial' || status === 'failed' || status === 'completed');
+  const canRetryFailedCells = Boolean(activeJobId) && failedCells > 0;
+  const canResumeIncompleteGrid = isIncompleteTerminalJob && !canRetryFailedCells;
+  const canCheckPartialJob = Boolean(activeJobId) && !canRetryFailedCells && !canResumeIncompleteGrid && hasIncompleteCells;
   const hasColoredCells = cellCount > 0 && completedCells > 0;
   const hasNoGridData = !hasColoredCells;
   const progressPercent = Math.min(100, Math.round((completedCells / totalCells) * 100));
-  const statusLabel = isGridFailed ? 'Error' : status === 'completed' || status === 'partial' ? 'Success' : isGridRunning ? 'Running' : 'Ready';
+  const statusLabel = isGridFailed ? 'Error' : status === 'completed' ? 'Complete' : status === 'partial' ? 'Partial' : isGridRunning ? 'Running' : 'Ready';
   return (
     <section className="panel" aria-labelledby="boundary-title">
       <div className="section-heading">
@@ -608,6 +610,10 @@ function BoundaryMapPanel({ heatmap, jobState, loading, onRefresh, onRunGrid, on
           {canRetryFailedCells ? (
             <button type="button" className="control-btn primary compact" onClick={onRetryFailed} disabled={isGridRunning}>
               {isRetryingFailedCells ? 'Retrying failed cells...' : 'Retry failed cells'}
+            </button>
+          ) : canResumeIncompleteGrid ? (
+            <button type="button" className="control-btn primary compact" onClick={onRetryFailed} disabled={isGridRunning}>
+              Resume grid
             </button>
           ) : canCheckPartialJob ? (
             <button type="button" className="control-btn primary compact" onClick={onRefresh} disabled={loading}>
@@ -640,6 +646,8 @@ function BoundaryMapPanel({ heatmap, jobState, loading, onRefresh, onRunGrid, on
           <div className="heatmap-empty-actions">
             {canRetryFailedCells ? (
               <button type="button" className="control-btn primary compact" onClick={onRetryFailed} disabled={isGridRunning}>{isRetryingFailedCells ? 'Retrying failed cells...' : 'Retry failed cells'}</button>
+            ) : canResumeIncompleteGrid ? (
+              <button type="button" className="control-btn primary compact" onClick={onRetryFailed} disabled={isGridRunning}>Resume grid</button>
             ) : canCheckPartialJob ? (
               <button type="button" className="control-btn primary compact" onClick={onRefresh} disabled={loading}>{loading ? 'Checking status...' : 'Check status'}</button>
             ) : (
