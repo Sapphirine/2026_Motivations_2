@@ -1651,6 +1651,80 @@ h3 {
   gap: 14px;
 }
 
+.scenario-detail-panel {
+  display: grid;
+  gap: 14px;
+  border-top: 1px solid #ece9e1;
+  padding-top: 14px;
+}
+
+.scenario-context {
+  margin: 0;
+  color: #232323;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.scenario-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr);
+  gap: 14px;
+}
+
+.scenario-tradeoff-row {
+  margin-top: 8px;
+}
+
+.stakeholder-list.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.intervention-option-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.intervention-option-list li {
+  border: 1px solid #d8d2c8;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fffcf6;
+  color: #232323;
+}
+
+.intervention-option-list strong,
+.intervention-option-list span {
+  display: block;
+}
+
+.intervention-option-list strong {
+  font-size: 13px;
+}
+
+.intervention-option-list span {
+  margin-top: 5px;
+  color: #5f646d;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.scenario-conflict-note {
+  margin-top: 0;
+  line-height: 1.45;
+}
+
+@media (max-width: 780px) {
+  .scenario-detail-grid,
+  .intervention-option-list,
+  .stakeholder-list.compact {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Preset chip row (Setup tab 2) */
 .preset-chip-row {
   display: grid;
@@ -2822,6 +2896,84 @@ h3 {
 }
 
 /* Methodology details (Tab 5) */
+.canonical-scenario-matrix {
+  padding: 22px;
+}
+
+.canonical-scenario-groups {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.canonical-scenario-group {
+  border-top: 1px solid #ece9e1;
+  padding-top: 12px;
+}
+
+.case-group-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.case-group-heading h3 {
+  margin: 0;
+  color: #232323;
+  font-size: 15px;
+}
+
+.case-group-heading span {
+  color: #6e7079;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.case-table {
+  display: grid;
+  border: 1px solid #d8d2c8;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fffcf6;
+}
+
+.case-table-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.1fr) minmax(140px, 0.7fr) minmax(240px, 1.2fr);
+  gap: 12px;
+  align-items: start;
+  padding: 10px 12px;
+}
+
+.case-table-row + .case-table-row {
+  border-top: 1px solid #ece9e1;
+}
+
+.case-table-row strong {
+  color: #232323;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.case-table-row span {
+  color: #5f646d;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+@media (max-width: 860px) {
+  .case-group-heading {
+    display: grid;
+  }
+
+  .case-table-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
 .methodology-details {
   padding: 22px;
 }

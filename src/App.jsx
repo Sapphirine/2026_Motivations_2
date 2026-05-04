@@ -56,6 +56,7 @@ import BoundaryHeatmap from './ui/BoundaryHeatmap.jsx';
 import AlignmentBadge from './ui/AlignmentBadge.jsx';
 import AgentLane from './ui/AgentLane.jsx';
 import PurposeCallout from './ui/PurposeCallout.jsx';
+import { presetScenarios } from './domain/seeds';
 
 const ACTIVE_MODEL = 'gpt-5.4-nano';
 const JUDGE_MODEL = 'gpt-5.4-mini';
@@ -84,7 +85,7 @@ const quickQuestions = [
 ];
 
 // 9 canonical adoption cases. Names mirror src/domain/seeds.ts.
-const scenarios = [
+const scenarioMeta = [
   { id: 'coding-assistant-low-trust-evaluation-anxiety', title: 'AI Coding Assistant: Low Trust and Manager Anxiety', group: 'Trust vs Productivity', conflict: 'Security vs Achievement' },
   { id: 'customer-support-ai-draft-rework-risk', title: 'Support Copilot: Draft Quality and Rework Fear', group: 'Trust vs Productivity', conflict: 'Security vs Achievement' },
   { id: 'analytics-copilot-data-confidence-gap', title: 'Analytics Copilot: Data Confidence Gap', group: 'Trust vs Productivity', conflict: 'Security vs Achievement' },
@@ -95,6 +96,8 @@ const scenarios = [
   { id: 'finance-ai-forecasting-accountability-risk', title: 'Finance Forecasting AI: Accountability Risk', group: 'Exploration vs Process Risk', conflict: 'Self-Direction vs Security' },
   { id: 'hr-ai-policy-answer-trust-gap', title: 'HR Policy Assistant: Trust Gap', group: 'Exploration vs Process Risk', conflict: 'Self-Direction vs Security' },
 ];
+const scenarioDetailsById = Object.fromEntries(presetScenarios.map((scenario) => [scenario.id, scenario]));
+const scenarios = scenarioMeta.map((meta) => ({ ...scenarioDetailsById[meta.id], ...meta }));
 
 const profiles = [
   { id: 'achievement',  name: 'Achievement',       tone: 'ROI and visible competence',       schwartz: 'Achievement · high', weights: { achievement: 0.8, self_direction: 0.5, security: 0.5, benevolence: 0.2 } },
@@ -246,6 +249,83 @@ function ScenarioGroupedDropdown({ value, onChange }) {
         ))}
       </select>
     </label>
+  );
+}
+
+function ScenarioDetailPanel({ scenario }) {
+  const options = Array.isArray(scenario?.decisionOptions) ? scenario.decisionOptions : [];
+  const tradeoffs = Array.isArray(scenario?.tradeoffs) ? scenario.tradeoffs : [];
+  const stakeholders = Array.isArray(scenario?.stakeholders) ? scenario.stakeholders : [];
+
+  return (
+    <div className="scenario-detail-panel" aria-label="Selected adoption case details">
+      <p className="scenario-context">{scenario.context}</p>
+      <div className="scenario-detail-grid">
+        <div>
+          <p className="detail-subhead">Tradeoffs</p>
+          <div className="tag-row scenario-tradeoff-row">
+            {tradeoffs.map((tradeoff) => <span key={tradeoff}>{tradeoff}</span>)}
+          </div>
+        </div>
+        <div>
+          <p className="detail-subhead">Stakeholders</p>
+          <ul className="stakeholder-list compact">
+            {stakeholders.map((stakeholder) => <li key={stakeholder}>{stakeholder}</li>)}
+          </ul>
+        </div>
+      </div>
+      <div>
+        <p className="detail-subhead">Intervention options</p>
+        <ol className="intervention-option-list">
+          {options.map((option) => (
+            <li key={option.id}>
+              <strong>{option.id.replace('option_', '').toUpperCase()}. {option.label}</strong>
+              <span>{option.description}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+      <p className="dim-note scenario-conflict-note">{scenario.conflictNotes}</p>
+    </div>
+  );
+}
+
+function CanonicalScenarioMatrix() {
+  const grouped = useMemo(() => {
+    const map = new Map();
+    for (const scenario of scenarios) {
+      if (!map.has(scenario.group)) map.set(scenario.group, []);
+      map.get(scenario.group).push(scenario);
+    }
+    return [...map.entries()];
+  }, []);
+
+  return (
+    <section className="panel canonical-scenario-matrix" aria-labelledby="canonical-scenarios-title">
+      <div className="section-heading">
+        <div><span className="eyebrow">Evaluation set</span><h2 id="canonical-scenarios-title">9 canonical adoption cases</h2></div>
+        <Microscope aria-hidden="true" />
+      </div>
+      <div className="canonical-scenario-groups">
+        {grouped.map(([group, items]) => (
+          <section key={group} className="canonical-scenario-group" aria-labelledby={`case-group-${group.replace(/\W+/g, '-').toLowerCase()}`}>
+            <div className="case-group-heading">
+              <h3 id={`case-group-${group.replace(/\W+/g, '-').toLowerCase()}`}>{group}</h3>
+              <span>{items[0]?.conflict}</span>
+            </div>
+            <div className="case-table" role="table" aria-label={`${group} cases`}>
+              {items.map((scenario) => (
+                <div className="case-table-row" role="row" key={scenario.id}>
+                  <strong role="cell">{scenario.title}</strong>
+                  <span role="cell">{scenario.domain}</span>
+                  <span role="cell">{scenario.tradeoffs?.slice(0, 3).join(' · ')}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1503,6 +1583,7 @@ function App() {
           <p className="panel-note">
             <strong>{selectedScenario.title}</strong> - {selectedScenario.group} · adoption blocker: {selectedScenario.conflict}
           </p>
+          <ScenarioDetailPanel scenario={selectedScenario} />
         </section>
       ),
     },
@@ -1671,13 +1752,14 @@ function App() {
 
   const methodSteps = [
     { n: 1, title: 'Purpose at a glance',  body: <PurposeCallout /> },
-    { n: 2, title: 'Methodology',           body: <MethodologyDetails /> },
-    { n: 3, title: 'Local evaluation summary', body: <LocalEvaluationPanel /> },
-    { n: 4, title: 'Q&A',                   body: <QAWidget selectedScenario={selectedScenario} currentRun={currentRun} /> },
-    { n: 5, title: 'Artifacts',             body: <ArtifactLinks run={currentRun} /> },
-    { n: 6, title: 'Run history',           body: <EvidenceLedger refreshKey={currentRun?.id ?? 'none'} /> },
-    { n: 7, title: 'Settings · OpenAI key', body: <UserKeySettings /> },
-    { n: 8, title: 'Diagnostics',           body: <DiagnosticsPanel /> },
+    { n: 2, title: 'Canonical cases',       body: <CanonicalScenarioMatrix /> },
+    { n: 3, title: 'Methodology',           body: <MethodologyDetails /> },
+    { n: 4, title: 'Local evaluation summary', body: <LocalEvaluationPanel /> },
+    { n: 5, title: 'Q&A',                   body: <QAWidget selectedScenario={selectedScenario} currentRun={currentRun} /> },
+    { n: 6, title: 'Artifacts',             body: <ArtifactLinks run={currentRun} /> },
+    { n: 7, title: 'Run history',           body: <EvidenceLedger refreshKey={currentRun?.id ?? 'none'} /> },
+    { n: 8, title: 'Settings · OpenAI key', body: <UserKeySettings /> },
+    { n: 9, title: 'Diagnostics',           body: <DiagnosticsPanel /> },
   ];
 
   return (
