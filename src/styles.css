@@ -1147,31 +1147,6 @@ h3 {
   gap: 8px;
 }
 
-.pdf-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 14px;
-  border: 1px solid #d8d2c8;
-  border-radius: 12px;
-  padding: 10px 14px;
-  background: #fffcf6;
-  color: #232323;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.pdf-link svg {
-  width: 16px;
-  height: 16px;
-  color: #5b5ce2;
-}
-
-.pdf-link:hover {
-  background: #f1f0ff;
-  border-color: rgba(91, 92, 226, 0.45);
-}
-
 @media (max-width: 720px) {
   .sensitivity-form {
     grid-template-columns: 1fr;

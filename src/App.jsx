@@ -73,7 +73,7 @@ const tabs = [
     subtitle: 'How declared, chosen, and justified intervention motivations agree or disagree.' },
   { id: 'boundary',    label: 'Boundary Map',         detail: '144-cell intervention sensitivity grid',
     subtitle: 'Which motivation weight actually changes the recommended intervention.' },
-  { id: 'method',      label: 'Method / Report',      detail: 'Purpose · methodology · Q&A · PDF',
+  { id: 'method',      label: 'Method / Report',      detail: 'Purpose · methodology · Q&A · evidence',
     subtitle: 'How the experiment is set up, and how to read the result.' },
 ];
 
@@ -882,15 +882,10 @@ function ArtifactLinks({ run }) {
   return (
     <section className="panel artifact-links" aria-labelledby="art-title">
       <div className="section-heading">
-        <div><span className="eyebrow">Evidence</span><h2 id="art-title">Artifacts &amp; PDF</h2></div>
+        <div><span className="eyebrow">Evidence</span><h2 id="art-title">Artifacts</h2></div>
         <FileText aria-hidden="true" />
       </div>
       <ul className="artifact-list">
-        <li>
-          <a className="pdf-link" href="/final_project.pdf">
-            <FileText aria-hidden="true" /> Download research report PDF
-          </a>
-        </li>
         {run?.id ? (
           <li>
             Per-run JSON: <a href={`/api/artifacts/${encodeURIComponent(run.id)}`}>/api/artifacts/{run.id}</a>
@@ -1674,7 +1669,7 @@ function App() {
     { n: 2, title: 'Methodology',           body: <MethodologyDetails /> },
     { n: 3, title: 'Local evaluation summary', body: <LocalEvaluationPanel /> },
     { n: 4, title: 'Q&A',                   body: <QAWidget selectedScenario={selectedScenario} currentRun={currentRun} /> },
-    { n: 5, title: 'Artifacts and PDF',     body: <ArtifactLinks run={currentRun} /> },
+    { n: 5, title: 'Artifacts',             body: <ArtifactLinks run={currentRun} /> },
     { n: 6, title: 'Run history',           body: <EvidenceLedger refreshKey={currentRun?.id ?? 'none'} /> },
     { n: 7, title: 'Settings · OpenAI key', body: <UserKeySettings /> },
     { n: 8, title: 'Diagnostics',           body: <DiagnosticsPanel /> },
