@@ -68,6 +68,17 @@ const fixtures: PolicyRagFixture[] = [
 ];
 
 export async function evaluatePolicyRag(env: Env) {
+  const fixtureScenarioIds = new Set(fixtures.map((fixture) => fixture.scenarioId));
+  const summaries = await listRecentRunsFromD1(env, 200);
+  const runs = (await Promise.all(
+    summaries.map((summary) => getRunAuthoritative(env, summary.runId, { hydrateOutputs: true })),
+  ))
+    .filter((run): run is ExperimentRun => Boolean(run))
+    .filter((run) => fixtureScenarioIds.has(run.scenarioId));
+  return evaluatePolicyRagForRuns(env, runs);
+}
+
+export async function evaluatePolicyRagForRuns(env: Env, runs: ExperimentRun[] = []) {
   const scenarioById = new Map(presetScenarios.map((scenario) => [scenario.id, scenario]));
   const fixtureRows = fixtures
     .map((fixture) => {
@@ -118,7 +129,6 @@ export async function evaluatePolicyRag(env: Env) {
     };
   }));
 
-  const uptake = await evaluateConstraintUptake(env);
   const totalRiskLabels = sum(riskRows.map((row) => row.expectedLabels));
   const matchedRiskLabels = sum(riskRows.map((row) => row.matchedLabels));
   const totalExpectedChunks = sum(retrievalRows.map((row) => row.expectedChunkIds.length));
@@ -147,16 +157,12 @@ export async function evaluatePolicyRag(env: Env) {
       expectedChunks: totalExpectedChunks,
       rows: retrievalRows,
     },
-    constraintUptake: uptake,
+    constraintUptake: evaluateConstraintUptakeFromRuns(runs),
   };
 }
 
-async function evaluateConstraintUptake(env: Env) {
+function evaluateConstraintUptakeFromRuns(runs: ExperimentRun[]) {
   const fixtureScenarioIds = new Set(fixtures.map((fixture) => fixture.scenarioId));
-  const summaries = await listRecentRunsFromD1(env, 200);
-  const runs = (await Promise.all(
-    summaries.map((summary) => getRunAuthoritative(env, summary.runId, { hydrateOutputs: true })),
-  )).filter((run): run is ExperimentRun => Boolean(run));
   const latestByScenario = new Map<string, ExperimentRun>();
   for (const run of runs) {
     if (!fixtureScenarioIds.has(run.scenarioId)) continue;

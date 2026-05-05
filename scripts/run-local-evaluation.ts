@@ -11,6 +11,7 @@ import type {
   Env,
   ExperimentRun,
   JudgeAxisId,
+  PolicyGroundingResult,
   ProfileId,
   Scenario,
   SensitivityGridCell,
@@ -18,9 +19,11 @@ import type {
   ValueProfile,
 } from '../src/domain/types.ts';
 import { evaluateCanonicalBattery } from '../src/experiments/adoption-evaluation.ts';
+import { evaluatePolicyRagForRuns } from '../src/experiments/policy-rag-evaluation.ts';
 import { extractRationaleAxis } from '../src/extractors/rationale-values.ts';
 import { judgeOption } from '../src/judges/value-judge.ts';
 import { getConfig } from '../src/services/config.ts';
+import { attachPolicyCompliance, retrievePolicyGrounding } from '../src/services/policy-rag.ts';
 import { runProfileProvider } from '../src/services/provider.ts';
 
 const AXES: JudgeAxisId[] = ['achievement', 'self_direction', 'security', 'benevolence'];
@@ -29,7 +32,9 @@ const SUBJECT_TRIALS = 5;
 const RAW_PATH = path.join('evaluation-results', 'local-canonical-evaluation.raw.json');
 const SUMMARY_PATH = path.join('evaluation-results', 'local-canonical-evaluation.summary.json');
 const PUBLIC_SUMMARY_PATH = path.join('public', 'evaluation', 'latest-local-evaluation.json');
+const PUBLIC_POLICY_RAG_PATH = path.join('public', 'evaluation', 'latest-policy-rag-evaluation.json');
 const TEX_RESULTS_PATH = path.join('final_program_tex', 'local_eval_results.tex');
+const TEX_POLICY_RAG_RESULTS_PATH = path.join('final_program_tex', 'policy_rag_eval_results.tex');
 const PROVIDER_MAX_ATTEMPTS = 4;
 
 type RawState = {
@@ -57,6 +62,7 @@ type CliOptions = {
   demoOverride: boolean;
   liveOverride: boolean;
   reset: boolean;
+  summarizeOnly: boolean;
 };
 
 const AXIS_LEGACY_TO_JUDGE: Record<AxisId, JudgeAxisId> = {
@@ -97,17 +103,22 @@ async function main() {
   state.model = config.openAIModel;
 
   console.log(`[eval:local] mode=${mode} model=${config.openAIModel} batteryId=${state.batteryId}`);
-  console.log('[eval:local] running 9 cases x 4 profiles x 5 trials = 180 subject outputs');
-  await runSubjectOutputs(state, env, config.openAIModel, generationSettings);
+  if (!options.summarizeOnly) {
+    console.log('[eval:local] running 9 cases x 4 profiles x 5 trials = 180 subject outputs');
+    await runSubjectOutputs(state, env, config.openAIModel, generationSettings);
 
-  console.log('[eval:local] running 20 same-profile baseline calls for the coding-assistant case');
-  await runSameProfileBaseline(state, env, config.openAIModel, generationSettings);
+    console.log('[eval:local] running 20 same-profile baseline calls for the coding-assistant case');
+    await runSameProfileBaseline(state, env, config.openAIModel, generationSettings);
 
-  console.log('[eval:local] running 144 low-vs-high axis contrasts (288 endpoint calls)');
-  await runSensitivityGrid(state, env, config.openAIModel, generationSettings);
+    console.log('[eval:local] running 144 low-vs-high axis contrasts (288 endpoint calls)');
+    await runSensitivityGrid(state, env, config.openAIModel, generationSettings);
+  } else {
+    console.log('[eval:local] summarize-only: reusing existing raw outputs and regenerating JSON/TeX summaries');
+  }
 
   const runs = buildExperimentRuns(state, config.openAIModel, generationSettings);
   const grid = buildGridJob(state);
+  const policyRagEvaluation = await evaluatePolicyRagForRuns(env, runs);
   const summary = {
     ...evaluateCanonicalBattery(runs, grid),
     localRun: {
@@ -120,12 +131,15 @@ async function main() {
       generatedAt: state.generatedAt,
     },
     sameProfileBaseline: summarizeSameProfileBaseline(state.sameProfileBaseline),
+    policyRagEvaluation,
   };
 
   await saveState(state);
   await writeJson(SUMMARY_PATH, summary);
   await writeJson(PUBLIC_SUMMARY_PATH, summary);
+  await writeJson(PUBLIC_POLICY_RAG_PATH, policyRagEvaluation);
   await writeFileWithDirs(TEX_RESULTS_PATH, renderLatexResults(summary));
+  await writeFileWithDirs(TEX_POLICY_RAG_RESULTS_PATH, renderPolicyRagLatexResults(policyRagEvaluation));
 
   printSummary(summary);
 }
@@ -145,7 +159,8 @@ async function runSubjectOutputs(state: RawState, env: Env, model: string, setti
 }
 
 async function runOneSubjectOutput(env: Env, state: RawState, model: string, settings: ExperimentRun['generationSettings'], scenario: Scenario, profile: ValueProfile, trial: number): Promise<AgentOutput> {
-  const result = await runProviderWithRetries(env, model, settings, scenario, profile, `subject ${scenario.id} ${profile.id} trial=${trial}`);
+  const policyGrounding = await getPolicyGrounding(env, scenario);
+  const result = await runProviderWithRetries(env, model, settings, scenario, profile, `subject ${scenario.id} ${profile.id} trial=${trial}`, policyGrounding);
   const judge = await judgeOption(env, scenario, result.structuredDecision.selectedOptionId, env.OPENAI_API_KEY);
   const extraction = await extractRationaleAxis(env, result.structuredDecision.rationale ?? '', env.OPENAI_API_KEY);
   const l1Top2 = computeL1Top2(profile);
@@ -184,7 +199,8 @@ async function runSameProfileBaseline(state: RawState, env: Env, model: string, 
   for (const profile of valueProfiles) {
     for (let trial = 0; trial < SUBJECT_TRIALS; trial += 1) {
       if (state.sameProfileBaseline.some((item) => item.scenarioId === scenario.id && item.profileId === profile.id && item.trial === trial)) continue;
-      const result = await runProviderWithRetries(env, model, settings, scenario, profile, `same-profile ${profile.id} trial=${trial}`);
+      const policyGrounding = await getPolicyGrounding(env, scenario);
+      const result = await runProviderWithRetries(env, model, settings, scenario, profile, `same-profile ${profile.id} trial=${trial}`, policyGrounding);
       state.sameProfileBaseline.push({
         scenarioId: scenario.id,
         profileId: profile.id,
@@ -203,6 +219,7 @@ async function runSensitivityGrid(state: RawState, env: Env, model: string, sett
   for (const scenario of presetScenarios) {
     for (const profile of valueProfiles) {
       const baseline = computeBaselineModal(state.subjectOutputs, scenario.id, profile.id);
+      const policyGrounding = await getPolicyGrounding(env, scenario);
       for (const axisId of AXES) {
         const existingIndex = state.gridResults.findIndex((cell) => cell.scenarioId === scenario.id && cell.profileId === profile.id && cell.axisId === axisId);
         if (existingIndex >= 0 && state.gridResults[existingIndex]?.contrastMode === 'low_high') continue;
@@ -210,8 +227,8 @@ async function runSensitivityGrid(state: RawState, env: Env, model: string, sett
         try {
           const lowProfile = setAxisEndpoint(profile, axisId, 0.2);
           const highProfile = setAxisEndpoint(profile, axisId, 0.8);
-          const lowResult = await runProviderWithRetries(env, model, settings, scenario, lowProfile, `grid ${scenario.id} ${profile.id} ${axisId} low`);
-          const highResult = await runProviderWithRetries(env, model, settings, scenario, highProfile, `grid ${scenario.id} ${profile.id} ${axisId} high`);
+          const lowResult = await runProviderWithRetries(env, model, settings, scenario, lowProfile, `grid ${scenario.id} ${profile.id} ${axisId} low`, policyGrounding);
+          const highResult = await runProviderWithRetries(env, model, settings, scenario, highProfile, `grid ${scenario.id} ${profile.id} ${axisId} high`, policyGrounding);
           const cell: SensitivityGridCell = {
             scenarioId: scenario.id,
             profileId: profile.id,
@@ -255,11 +272,16 @@ async function runProviderWithRetries(
   scenario: Scenario,
   profile: ValueProfile,
   label: string,
+  policyGrounding?: PolicyGroundingResult,
 ) {
   let lastError: unknown;
   for (let attempt = 1; attempt <= PROVIDER_MAX_ATTEMPTS; attempt += 1) {
     try {
-      return await runProfileProvider(env, model, settings, scenario, profile, env.OPENAI_API_KEY);
+      const result = await runProfileProvider(env, model, settings, scenario, profile, env.OPENAI_API_KEY, policyGrounding);
+      return {
+        ...result,
+        structuredDecision: attachPolicyCompliance(result.structuredDecision, policyGrounding),
+      };
     } catch (error) {
       lastError = error;
       const message = error instanceof Error ? error.message : String(error);
@@ -269,6 +291,14 @@ async function runProviderWithRetries(
     }
   }
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
+async function getPolicyGrounding(env: Env, scenario: Scenario): Promise<PolicyGroundingResult> {
+  const grounding = await retrievePolicyGrounding(env, scenario, { topK: 5, timeoutMs: 2000 });
+  if (!grounding.enabled && grounding.warning) {
+    console.warn(`[eval:local] policy RAG unavailable for ${scenario.id}: ${grounding.warning}`);
+  }
+  return grounding;
 }
 
 function buildExperimentRuns(state: RawState, model: string, generationSettings: ExperimentRun['generationSettings']): ExperimentRun[] {
@@ -487,6 +517,7 @@ function parseArgs(args: string[]): CliOptions {
     demoOverride: args.includes('--demo'),
     liveOverride: args.includes('--live'),
     reset: args.includes('--reset'),
+    summarizeOnly: args.includes('--summarize-only'),
   };
 }
 
@@ -494,9 +525,13 @@ function renderLatexResults(summary: any): string {
   const modeLabel = summary.localRun.mode === 'openai'
     ? `Live local OpenAI run (${latexEscape(summary.localRun.model)})`
     : 'Demo-mode smoke run (not paper-grade)';
-  const statusLine = summary.localRun.mode === 'openai'
+  const baseStatusLine = summary.localRun.mode === 'openai'
     ? 'The reported numbers were produced locally with \\texttt{DEMO\\_MODE=false}; no Cloudflare deployment was used.'
     : 'These numbers verify the local evaluation pipeline only. Replace them by running \\texttt{npm run eval:local} after adding a real \\texttt{OPENAI\\_API\\_KEY} and setting \\texttt{DEMO\\_MODE=false}.';
+  const gridStatusLine = summary.sensitivityGrid.completedCells < 144
+    ? ` Grid stopped at ${summary.sensitivityGrid.completedCells}/144 because the remaining cells failed; failed cells are preserved in the raw JSON artifact.`
+    : '';
+  const statusLine = `${baseStatusLine}${gridStatusLine}`;
   return [
     '% Auto-generated by npm run eval:local. Do not edit by hand.',
     '\\begin{table}[t]',
@@ -526,15 +561,53 @@ function renderLatexResults(summary: any): string {
   ].join('\n');
 }
 
+function renderPolicyRagLatexResults(summary: any): string {
+  const risk = summary.riskDetection ?? {};
+  const retrieval = summary.retrievalRecall ?? {};
+  const uptake = summary.constraintUptake ?? {};
+  const retrievalResult = retrieval.available
+    ? `${retrieval.matchedExpectedChunks ?? 0}/${retrieval.expectedChunks ?? 0} expected chunks (${pct(retrieval.recallAt5 ?? 0)})`
+    : 'Unavailable; start \\texttt{npm run rag:policy} before running evaluation.';
+  const uptakeResult = uptake.available
+    ? `${uptake.passOutputs ?? 0}/${uptake.outputsWithCompliance ?? 0} outputs passed (${pct(uptake.uptakeRate ?? 0)}); ${uptake.reviewOutputs ?? 0} marked for review`
+    : 'Unavailable; run scenarios with Policy-Grounding RAG enabled.';
+
+  return [
+    '% Auto-generated by npm run eval:local. Do not edit by hand.',
+    '\\begin{table}[t]',
+    '\\centering',
+    '\\caption{Policy-Grounding RAG evaluation results.}',
+    '\\label{tab:policy-rag-eval}',
+    '\\small',
+    '\\begin{tabular}{p{0.38\\columnwidth}p{0.50\\columnwidth}}',
+    '\\toprule',
+    'Metric & Local result \\\\',
+    '\\midrule',
+    `Risk/domain detection & ${risk.passedScenarios ?? 0}/${risk.totalScenarios ?? 0} scenarios passed; label coverage ${pct(risk.labelCoverage ?? 0)} \\\\`,
+    `Policy Retrieval Recall@5 & ${retrievalResult} \\\\`,
+    `Constraint uptake & ${uptakeResult} \\\\`,
+    `Corpus & ${summary.corpus?.curatedPolicyChunks ?? 37} curated chunks over ${summary.corpus?.canonicalScenarios ?? 9} canonical cases \\\\`,
+    '\\bottomrule',
+    '\\end{tabular}',
+    '\\par\\vspace{2pt}{\\footnotesize Retrieval is measured against hand-labeled expected policy chunks; uptake is measured by lightweight coverage checks over generated intervention cards.}',
+    '\\end{table}',
+    '',
+  ].join('\n');
+}
+
 function printSummary(summary: any) {
   console.log('[eval:local] complete');
   console.log(`[eval:local] subject outputs: ${summary.battery.subjectOutputs}/180`);
   console.log(`[eval:local] grid contrasts: ${summary.sensitivityGrid.completedCells}/144`);
   console.log(`[eval:local] average modal stability: ${pct(summary.stability.averageModalStability)}`);
   console.log(`[eval:local] endpoint flip rate: ${pct(summary.sensitivityGrid.flipRate)}`);
+  console.log(`[eval:local] policy RAG recall@5: ${pct(summary.policyRagEvaluation.retrievalRecall.recallAt5 ?? 0)}`);
+  console.log(`[eval:local] policy RAG uptake: ${pct(summary.policyRagEvaluation.constraintUptake.uptakeRate ?? 0)}`);
   console.log(`[eval:local] wrote ${SUMMARY_PATH}`);
   console.log(`[eval:local] wrote ${PUBLIC_SUMMARY_PATH}`);
+  console.log(`[eval:local] wrote ${PUBLIC_POLICY_RAG_PATH}`);
   console.log(`[eval:local] wrote ${TEX_RESULTS_PATH}`);
+  console.log(`[eval:local] wrote ${TEX_POLICY_RAG_RESULTS_PATH}`);
 }
 
 function pct(value: number): string {

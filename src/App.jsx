@@ -1559,17 +1559,45 @@ function PolicyRagEvaluationPanel() {
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [source, setSource] = useState('');
 
-  const load = async () => {
-    setLoading(true);
-    setError('');
-    try {
+  const fetchPolicyRagSummary = async ({ preferStatic = false } = {}) => {
+    const staticPath = '/evaluation/latest-policy-rag-evaluation.json';
+    const readStatic = async () => {
+      const response = await fetch(staticPath, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return { data: await response.json(), source: staticPath };
+    };
+    const readApi = async () => {
       const response = await fetch('/api/evaluations/policy-rag', { cache: 'no-store' });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw data || new Error('Policy RAG evaluation unavailable');
+      return { data, source: '/api/evaluations/policy-rag' };
+    };
+    if (preferStatic) {
+      try {
+        return await readStatic();
+      } catch {
+        return readApi();
+      }
+    }
+    try {
+      return await readApi();
+    } catch {
+      return readStatic();
+    }
+  };
+
+  const load = async ({ preferStatic = false } = {}) => {
+    setLoading(true);
+    setError('');
+    try {
+      const { data, source: nextSource } = await fetchPolicyRagSummary({ preferStatic });
       setSummary(data);
+      setSource(nextSource);
     } catch (err) {
       setSummary(null);
+      setSource('');
       setError(getProblemMessage(err, 'Policy RAG evaluation unavailable.'));
     } finally {
       setLoading(false);
@@ -1582,13 +1610,15 @@ function PolicyRagEvaluationPanel() {
       setLoading(true);
       setError('');
       try {
-        const response = await fetch('/api/evaluations/policy-rag', { cache: 'no-store' });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw data || new Error('Policy RAG evaluation unavailable');
-        if (!cancelled) setSummary(data);
+        const { data, source: nextSource } = await fetchPolicyRagSummary({ preferStatic: true });
+        if (!cancelled) {
+          setSummary(data);
+          setSource(nextSource);
+        }
       } catch (err) {
         if (!cancelled) {
           setSummary(null);
+          setSource('');
           setError(getProblemMessage(err, 'Policy RAG evaluation unavailable.'));
         }
       } finally {
@@ -1616,6 +1646,7 @@ function PolicyRagEvaluationPanel() {
           <p className="panel-note">
             Evaluation corpus: {summary.corpus?.canonicalScenarios ?? 9} canonical adoption cases,
             {' '}{summary.corpus?.curatedPolicyChunks ?? 37} curated policy chunks. Recall@5 requires the local Chroma sidecar.
+            {' '}Source: <code>{source || '/api/evaluations/policy-rag'}</code>.
           </p>
           <dl className="local-evaluation-grid">
             <div><dt>Risk coverage</dt><dd>{risk?.passedScenarios ?? 0} / {risk?.totalScenarios ?? 0}</dd></div>
@@ -1661,7 +1692,7 @@ function PolicyRagEvaluationPanel() {
               </div>
             </div>
           </details>
-          <button className="control-btn secondary compact policy-eval-refresh" type="button" onClick={load} disabled={loading}>
+          <button className="control-btn secondary compact policy-eval-refresh" type="button" onClick={() => load({ preferStatic: false })} disabled={loading}>
             {loading ? <Loader2 aria-hidden="true" className="spinner-icon" /> : <RefreshCcw aria-hidden="true" />} Refresh RAG evaluation
           </button>
         </>

@@ -44,8 +44,14 @@ export function detectRiskContext(scenario: Scenario): RiskContext {
   if (matches(text, ['surveillance', 'monitor', 'tracking', 'manager will see', 'visibility', 'scoreboard'])) {
     addRisk('surveillance', 'monitoring or evaluation anxiety');
   }
+  if (matches(text, ['performance', 'evaluation', 'evaluated', 'used against', 'dependence', 'stigma'])) {
+    addRisk('surveillance', 'performance visibility anxiety');
+  }
   if (matches(text, ['bias', 'fairness', 'equity', 'disparate', 'accommodation', 'benefits', 'leave', 'hiring', 'employment', 'selection'])) {
     addRisk('bias and fairness', 'fairness or employment impact');
+  }
+  if (matches(text, ['hr', 'human resources', 'benefits', 'leave', 'accommodation', 'employee record', 'employee policy'])) {
+    addRisk('privacy', 'HR policy or employee data context');
   }
   if (matches(text, ['wrong', 'hallucinated', 'accuracy', 'quality', 'rework', 'policy errors', 'citation', 'source', 'metric'])) {
     addRisk('output accuracy', 'wrong output or rework risk');
@@ -57,10 +63,12 @@ export function detectRiskContext(scenario: Scenario): RiskContext {
   if (matches(text, ['finance', 'forecast', 'model', 'dashboard', 'metric', 'audit', 'assumption', 'planning'])) {
     addRisk('model validation', 'finance or analytics model use');
     addRisk('accountability', 'audit or assumption ownership');
+    addRisk('human oversight', 'model or forecast validation requires review');
   }
   if (matches(text, ['customer', 'marketing', 'brand', 'claims', 'sales', 'support', 'consumer'])) {
     addRisk('consumer harm', 'customer-facing workflow');
     addRisk('deceptive claims', 'customer-facing AI content or claims');
+    addRisk('transparency', 'customer-facing AI use');
   }
   if (matches(text, ['employee', 'worker', 'manager', 'team', 'peers', 'psychological safety', 'stigma', 'dependence'])) {
     addRisk('worker well-being', 'workplace adoption context');
@@ -79,7 +87,7 @@ export function detectRiskContext(scenario: Scenario): RiskContext {
   return {
     domain,
     affectedStakeholders: dedupe(scenario.stakeholders).slice(0, 8),
-    riskTypes: Array.from(riskTypes).slice(0, 8),
+    riskTypes: Array.from(riskTypes).slice(0, 10),
     deploymentStage: detectDeploymentStage(text),
     detectionSignals: dedupe(signals).slice(0, 8),
   };
@@ -220,8 +228,18 @@ export function checkPolicyCompliance(
 }
 
 function detectDomain(text: string, scenarioDomain: string): string {
+  const declared = scenarioDomain.toLowerCase();
+  if (matches(declared, ['software', 'coding', 'engineering'])) return 'software engineering';
+  if (matches(declared, ['customer support', 'support'])) return 'customer support';
+  if (matches(declared, ['business analytics', 'analytics'])) return 'business analytics';
+  if (matches(declared, ['team management', 'workplace'])) return 'workplace AI adoption';
+  if (matches(declared, ['legal'])) return 'legal operations';
+  if (matches(declared, ['sales'])) return 'sales';
+  if (matches(declared, ['marketing'])) return 'marketing';
+  if (matches(declared, ['finance'])) return 'finance';
+  if (matches(declared, ['human resources', 'hr'])) return 'human resources';
+
   if (matches(text, ['school', 'student', 'teacher', 'education', 'tutor'])) return 'education';
-  if (matches(text, ['hr', 'employee', 'benefits', 'leave', 'accommodation', 'hiring'])) return 'human resources';
   if (matches(text, ['legal', 'attorney', 'clause', 'matter', 'counsel'])) return 'legal operations';
   if (matches(text, ['finance', 'forecast', 'budget', 'planning'])) return 'finance';
   if (matches(text, ['analytics', 'dashboard', 'metric', 'sql', 'data model'])) return 'business analytics';
@@ -229,6 +247,7 @@ function detectDomain(text: string, scenarioDomain: string): string {
   if (matches(text, ['sales', 'crm', 'account plan'])) return 'sales';
   if (matches(text, ['marketing', 'brand', 'campaign'])) return 'marketing';
   if (matches(text, ['software', 'coding', 'code'])) return 'software engineering';
+  if (matches(text, ['hr', 'benefits', 'leave', 'accommodation', 'hiring'])) return 'human resources';
   if (matches(text, ['manager', 'team', 'worker', 'employee'])) return 'workplace AI adoption';
   return scenarioDomain || 'general AI adoption';
 }

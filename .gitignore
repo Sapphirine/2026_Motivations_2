@@ -12,6 +12,7 @@ dist/
 research-data/
 evaluation-results/
 public/evaluation/latest-local-evaluation.json
+public/evaluation/latest-policy-rag-evaluation.json
 
 # Internal planning artifacts — not part of the published deliverable.
 01-spec.md
