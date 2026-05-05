@@ -249,8 +249,9 @@ async function runSensitivityGrid(state: RawState, env: Env, model: string, sett
             completedAt: nowSeconds(),
           };
           state.gridResults.push(cell);
+          removeGridError(state, scenario.id, profile.id, axisId);
         } catch (error) {
-          state.gridErrors.push({
+          upsertGridError(state, {
             scenarioId: scenario.id,
             profileId: profile.id,
             axisId,
@@ -323,7 +324,8 @@ function buildExperimentRuns(state: RawState, model: string, generationSettings:
 }
 
 function buildGridJob(state: RawState): SensitivityGridJob {
-  const status = state.gridResults.length >= 144 && state.gridErrors.length === 0
+  const unresolvedErrors = state.gridErrors.filter((error) => !state.gridResults.some((cell) => sameGridCell(cell, error)));
+  const status = state.gridResults.length >= 144 && unresolvedErrors.length === 0
     ? 'completed'
     : state.gridResults.length > 0
       ? 'partial'
@@ -334,13 +336,13 @@ function buildGridJob(state: RawState): SensitivityGridJob {
     status,
     totalCells: 144,
     completedCells: state.gridResults.length,
-    failedCells: state.gridErrors.length,
+    failedCells: unresolvedErrors.length,
     errorBudget: 12,
     scenarioIds: presetScenarios.map((scenario) => scenario.id),
     profileIds: valueProfiles.map((profile) => profile.id),
     axisIds: AXES,
     results: state.gridResults,
-    errors: state.gridErrors.map((error) => ({
+    errors: unresolvedErrors.map((error) => ({
       scenarioId: error.scenarioId,
       profileId: error.profileId,
       axisId: error.axisId,
@@ -354,6 +356,24 @@ function buildGridJob(state: RawState): SensitivityGridJob {
     updatedAt: nowSeconds(),
     completedAt: status === 'completed' ? nowSeconds() : undefined,
   };
+}
+
+function upsertGridError(state: RawState, error: RawState['gridErrors'][number]) {
+  removeGridError(state, error.scenarioId, error.profileId, error.axisId);
+  state.gridErrors.push(error);
+}
+
+function removeGridError(state: RawState, scenarioId: string, profileId: ProfileId, axisId: JudgeAxisId) {
+  state.gridErrors = state.gridErrors.filter((error) => (
+    error.scenarioId !== scenarioId || error.profileId !== profileId || error.axisId !== axisId
+  ));
+}
+
+function sameGridCell(
+  cell: Pick<SensitivityGridCell, 'scenarioId' | 'profileId' | 'axisId'>,
+  error: Pick<RawState['gridErrors'][number], 'scenarioId' | 'profileId' | 'axisId'>,
+): boolean {
+  return cell.scenarioId === error.scenarioId && cell.profileId === error.profileId && cell.axisId === error.axisId;
 }
 
 function summarizeSameProfileBaseline(records: SameProfileBaselineResult[]) {
