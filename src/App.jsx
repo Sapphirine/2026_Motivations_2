@@ -1381,6 +1381,7 @@ function BoundaryMapPanel({ heatmap, jobState, loading, onRefresh, onRunGrid, on
   const statusLabel = isGridFailed ? 'Error' : status === 'completed' ? 'Complete' : status === 'partial' ? 'Partial' : isGridRunning ? 'Running' : 'Ready';
   const gridLabel = `${totalCells}-contrast`;
   const endpointCallCount = totalCells * 2;
+  const isSingleCaseGrid = totalCells <= 16 || (Array.isArray(heatmap?.scenarios) && heatmap.scenarios.length === 1);
   return (
     <section className="panel" aria-labelledby="boundary-title">
       <div className="section-heading">
@@ -1453,23 +1454,25 @@ function BoundaryMapPanel({ heatmap, jobState, loading, onRefresh, onRunGrid, on
         {hasColoredCells ? (
           <>
             <p>
-              Each row is an adoption case, each major column is one of 4 motivational profiles, and each profile splits into 4 sub-cells. Each sub-cell compares the intervention selected when that axis is set low (0.2) versus high (0.8).
+              {isSingleCaseGrid
+                ? 'This row is the current adoption case. Each profile has 4 axis contrasts, comparing low (0.2) versus high (0.8).'
+                : 'Each row is an adoption case. Each profile has 4 axis contrasts, comparing low (0.2) versus high (0.8).'}
             </p>
             <ul className="heatmap-explainer-legend">
               <li>
                 <span className="hm-legend-dot hm-legend-flip" aria-hidden="true" />
-                <strong>Red</strong> - low and high endpoint settings selected different interventions, revealing a <em>load-bearing</em> motivation in that adoption case.
+                <strong>Red</strong> - recommendation changed; the axis is <em>load-bearing</em>.
               </li>
               <li>
                 <span className="hm-legend-dot hm-legend-noflip" aria-hidden="true" />
-                <strong>Green</strong> - intervention held across the low-vs-high contrast.
+                <strong>Green</strong> - recommendation stayed stable.
               </li>
               <li>
                 <span className="hm-legend-dot hm-legend-inconclusive" aria-hidden="true" />
-                <strong>Gray</strong> - endpoint contrast unavailable or inconclusive.
+                <strong>Gray</strong> - unavailable or inconclusive.
               </li>
             </ul>
-            <p className="heatmap-explainer-hint">Click any cell for the low-vs-high intervention pair.</p>
+            <p className="heatmap-explainer-hint">Click a cell to inspect the low-vs-high intervention pair.</p>
           </>
         ) : (
           <p className="heatmap-explainer-hint">Waiting for sensitivity contrasts. Progress can be checked above while the {gridLabel} grid is pending.</p>
