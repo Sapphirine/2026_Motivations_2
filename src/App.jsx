@@ -168,6 +168,45 @@ const profiles = [
   { id: 'neutral',      name: 'Neutral baseline',  tone: 'balanced weights',                schwartz: 'All axes balanced',   weights: { achievement: 0.5, self_direction: 0.5, security: 0.5, benevolence: 0.5 } },
 ];
 
+const motivationIntakeItems = [
+  {
+    id: 'visible_progress',
+    label: 'I need visible performance gains.',
+    description: 'The adoption action should show measurable value, speed, or skill growth.',
+    weights: { achievement: 2 },
+  },
+  {
+    id: 'experiment_choice',
+    label: 'I want freedom to experiment before committing.',
+    description: 'The rollout should preserve choice, discovery, and workflow fit.',
+    weights: { self_direction: 2, achievement: 0.5 },
+  },
+  {
+    id: 'risk_safety',
+    label: 'I am worried about risk, safety, or policy.',
+    description: 'The first action needs safeguards, reversibility, and clear stop conditions.',
+    weights: { security: 2 },
+  },
+  {
+    id: 'protect_people',
+    label: 'I care most about protecting affected people.',
+    description: 'The intervention should protect students, employees, customers, or other stakeholders from harm.',
+    weights: { benevolence: 2, security: 0.5 },
+  },
+  {
+    id: 'manager_judgment',
+    label: 'I worry my manager or team will judge my AI use.',
+    description: 'The action should reduce stigma and make appropriate AI use socially safe.',
+    weights: { benevolence: 1.5, security: 1 },
+  },
+  {
+    id: 'safe_start',
+    label: 'I do not know where to safely start.',
+    description: 'The action should define a small entry point with an explicit boundary.',
+    weights: { security: 1.5, self_direction: 0.5 },
+  },
+];
+
 const axes = [
   { id: 'achievement',    label: 'Achieve', full: 'Achievement' },
   { id: 'self_direction', label: 'Self-dir', full: 'Self-Direction' },
@@ -177,6 +216,53 @@ const axes = [
 
 const defaultScenarioId = 'coding-assistant-low-trust-evaluation-anxiety';
 const profileNameById = Object.fromEntries(profiles.map((p) => [p.id, p.name]));
+const axisNameById = Object.fromEntries(axes.map((axis) => [axis.id, axis.full]));
+
+function inferMotivationIntake(selectedIds) {
+  const selected = motivationIntakeItems.filter((item) => selectedIds.includes(item.id));
+  const scores = { achievement: 0, self_direction: 0, security: 0, benevolence: 0 };
+  for (const item of selected) {
+    for (const [axis, value] of Object.entries(item.weights)) {
+      scores[axis] += value;
+    }
+  }
+
+  if (selected.length === 0) {
+    return {
+      selectedCount: 0,
+      scores,
+      weights: profiles.find((profile) => profile.id === 'neutral').weights,
+      profileId: 'neutral',
+      profileName: 'Neutral baseline',
+      primaryAxes: ['No intake selected'],
+      summary: 'No self-report blockers selected yet. The benchmark still compares all four profiles.',
+    };
+  }
+
+  const maxScore = Math.max(...Object.values(scores));
+  const weights = Object.fromEntries(Object.entries(scores).map(([axis, score]) => {
+    if (score === 0) return [axis, 0.2];
+    if (score === maxScore) return [axis, 0.8];
+    return [axis, 0.5];
+  }));
+  const nearest = profiles.reduce((best, profile) => {
+    const distance = Object.keys(scores).reduce((sum, axis) => sum + Math.abs((profile.weights[axis] ?? 0.5) - weights[axis]), 0);
+    return distance < best.distance ? { profile, distance } : best;
+  }, { profile: profiles[3], distance: Number.POSITIVE_INFINITY }).profile;
+  const primaryAxes = Object.entries(scores)
+    .filter(([, score]) => score === maxScore)
+    .map(([axis]) => axisNameById[axis] ?? axis);
+
+  return {
+    selectedCount: selected.length,
+    scores,
+    weights,
+    profileId: nearest.id,
+    profileName: nearest.name,
+    primaryAxes,
+    summary: `Self-report intake estimates ${nearest.name.toLowerCase()} as the closest profile, with strongest signal on ${primaryAxes.join(' and ')}.`,
+  };
+}
 
 // ============================================================================
 // localStorage / auth helpers (preserved from prior shell)
@@ -564,6 +650,54 @@ function CustomScenarioComposer({
       </div>
       {error ? <p className="error-text" role="alert">{error}</p> : null}
     </form>
+  );
+}
+
+function MotivationIntakePanel({ selectedIds, onToggle, result, onApply }) {
+  const hasSelections = result.selectedCount > 0;
+  return (
+    <section className="motivation-intake" aria-labelledby="motivation-intake-title">
+      <div className="motivation-intake-head">
+        <div>
+          <span className="eyebrow">Motivation intake</span>
+          <h3 id="motivation-intake-title">Estimate the user's adoption blocker from self-report</h3>
+        </div>
+        <div className="intake-estimate" aria-live="polite">
+          <span>{hasSelections ? 'Inferred profile' : 'Default profile'}</span>
+          <strong>{result.profileName}</strong>
+        </div>
+      </div>
+
+      <p className="panel-note">
+        This is an explicit intake layer, not hidden psychometric inference. It estimates which profile to inspect; the canonical evaluation still runs the controlled 9 cases across all four profiles.
+      </p>
+
+      <div className="intake-option-grid">
+        {motivationIntakeItems.map((item) => (
+          <label key={item.id} className={`intake-option ${selectedIds.includes(item.id) ? 'is-selected' : ''}`}>
+            <input
+              type="checkbox"
+              checked={selectedIds.includes(item.id)}
+              onChange={() => onToggle(item.id)}
+            />
+            <span>
+              <strong>{item.label}</strong>
+              <small>{item.description}</small>
+            </span>
+          </label>
+        ))}
+      </div>
+
+      <div className="intake-result-row">
+        <div>
+          <strong>{result.summary}</strong>
+          <span>Estimated axes: {result.primaryAxes.join(' · ')}</span>
+        </div>
+        <button className="control-btn secondary" type="button" onClick={onApply}>
+          Apply estimate to compass
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -1875,6 +2009,7 @@ function App() {
   // Profile / weights state for the Setup compass
   const [profileWeights, setProfileWeights] = useState(profiles[1].weights); // Exploration
   const [activePresetId, setActivePresetId] = useState('exploration');
+  const [motivationIntakeSelections, setMotivationIntakeSelections] = useState([]);
 
   // Live run state
   const [currentRun, setCurrentRun] = useState(null);
@@ -1914,6 +2049,10 @@ function App() {
     [availableScenarios, selectedScenarioId],
   );
   const selectedScenarioIsRunnable = scenarioMode === 'canonical' || selectedScenario?.kind === 'custom';
+  const motivationIntakeResult = useMemo(
+    () => inferMotivationIntake(motivationIntakeSelections),
+    [motivationIntakeSelections],
+  );
   const buildHeatmapScenarioRows = (scenarioIds) => (
     scenarioIds.map((scenarioId) => {
       const scenario = availableScenarios.find((item) => item.id === scenarioId);
@@ -2020,6 +2159,15 @@ function App() {
   const onPresetPick = (preset) => {
     setProfileWeights(preset.weights);
     setActivePresetId(preset.id);
+  };
+  const toggleMotivationIntake = (id) => {
+    setMotivationIntakeSelections((prev) => (
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    ));
+  };
+  const applyMotivationIntake = () => {
+    setProfileWeights(motivationIntakeResult.weights);
+    setActivePresetId(null);
   };
   const onScenarioModeChange = (nextMode) => {
     setScenarioMode(nextMode);
@@ -2516,6 +2664,12 @@ function App() {
           <div className="section-heading">
             <div><span className="eyebrow">Motivation profile</span><h2 id="setup-compass-title">Pick a preset or drag the compass</h2></div>
           </div>
+          <MotivationIntakePanel
+            selectedIds={motivationIntakeSelections}
+            onToggle={toggleMotivationIntake}
+            result={motivationIntakeResult}
+            onApply={applyMotivationIntake}
+          />
           <PresetChips active={activePresetId} onPick={onPresetPick} />
           <SchwartzCompass
             weights={profileWeights}
@@ -2561,6 +2715,11 @@ function App() {
           <p className="panel-note">
             Adoption case: <strong>{selectedScenario.title}</strong> · model: <code>{ACTIVE_MODEL}</code> · trial count: {currentRun?.trialCount ?? 5}
           </p>
+          {motivationIntakeResult.selectedCount > 0 ? (
+            <p className="panel-note">
+              Motivation intake: inferred <strong>{motivationIntakeResult.profileName}</strong> from explicit self-report. This run still compares all four motivation profiles.
+            </p>
+          ) : null}
           {runError ? (
             <div className="problem-detail" role="alert">
               <div className="problem-head">
