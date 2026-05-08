@@ -1,15 +1,14 @@
 /**
  * MotiveOps - front-end shell (5-tab IA).
  *
- * UPDATED 2026-05-02 for the MotiveOps AI workflow adoption pivot
- * (see 01-spec.md + 02-design.md). Replaces the prior 6-tab layout with:
+ * Uses a 5-tab layout with:
  *   1. Setup              - adoption-case picker + motivation compass + canonical-battery CTA
  *   2. Run Live           - 4 AgentLane cards (summary-first)
  *   3. Three-Layer Analysis - per-agent ThreeLayerChart + AlignmentBadge
  *   4. Boundary Map       - sensitivity BoundaryHeatmap + job progress
  *   5. Method / Report    - PurposeCallout + methodology + Q&A + artifacts
  *
- * Backend contracts consumed (Lane A is implementing in parallel):
+ * Backend contracts consumed:
  *   GET  /api/scenarios
  *   GET  /api/scenarios/:id
  *   POST /api/experiments/run                          { scenarioId, profileIds, trialCount: 5 } -> { runId, run }
@@ -66,7 +65,7 @@ const USER_KEY_STORAGE = 'userOpenAIKey';
 const USER_KEY_REMEMBER = 'userOpenAIKeyRemember';
 const THREE_LAYER_RUN_STORAGE = 'motivationLab.selectedThreeLayerRunId';
 
-// --- 5 top-level tabs (IA per 01-spec §11) ---
+// --- 5 top-level tabs ---
 const tabs = [
   { id: 'setup',       label: 'Setup',                detail: 'Pick an adoption case - set the motivation profile',
     subtitle: 'Pick the AI workflow adoption case and motivational profile.' },
@@ -2022,7 +2021,7 @@ function App() {
 
   // Per-profile retry state - keys are profile ids, values are loading or error.
   // Wired to AgentLane's onRetry/retrying/retryError props for cell-by-cell
-  // retryability per 01-spec §12.2 F-12.2.4.
+  // retryability for failed per-profile runs.
   const [retryingByProfile, setRetryingByProfile] = useState({});
   const [retryErrorsByProfile, setRetryErrorsByProfile] = useState({});
 
@@ -2280,7 +2279,7 @@ function App() {
     }
   };
 
-  // ---- Per-profile retry (01-spec §12.2 F-12.2.4) ----
+  // ---- Per-profile retry ----
   // Re-runs a single agent within an existing terminal run when its lane is
   // stuck (zero outputs or fewer outputs than trialCount). Sequential
   // server-side so it stays inside the Worker 25s wall budget.
