@@ -11,27 +11,27 @@ Included derived corpus file:
 ## Core Responsible-AI Governance
 
 - NIST AI Risk Management Framework 1.0  
-  https://www.nist.gov/itl/ai-risk-management-framework
+  https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-ai-rmf-10
 
 - NIST AI 100-1, Artificial Intelligence Risk Management Framework (AI RMF 1.0) PDF  
   https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-1.pdf
 
 - NIST Generative AI Profile, NIST AI 600-1  
-  https://www.nist.gov/itl/ai-risk-management-framework/generative-ai-profile
+  https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-generative-artificial-intelligence
 
 - NIST AI 600-1 PDF  
   https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.600-1.pdf
 
 - NIST Privacy Framework  
-  https://www.nist.gov/privacy-framework
+  https://nvlpubs.nist.gov/nistpubs/CSWP/NIST.CSWP.40.ipd.pdf
 
 - NIST Cybersecurity Framework 2.0  
-  https://www.nist.gov/cyberframework
+  https://www.nist.gov/publications/nist-cybersecurity-framework-csf-20
 
 ## Education, Student Privacy, and AI Tutoring
 
-- U.S. Department of Education, AI and the Future of Teaching and Learning  
-  https://tech.ed.gov/ai-future-of-teaching-and-learning/
+- U.S. Department of Education, Artificial Intelligence guidance  
+  https://www.ed.gov/about/ed-overview/artificial-intelligence-ai-guidance
 
 - U.S. Department of Education, Student Privacy Policy Office  
   https://studentprivacy.ed.gov/
@@ -49,15 +49,18 @@ Included derived corpus file:
   https://studentprivacy.ed.gov/resources/protection-pupil-rights-amendment-ppra-model-notice
 
 - UNESCO Guidance for Generative AI in Education and Research  
-  https://www.unesco.org/en/articles/guidance-generative-ai-education-and-research
+  https://unesdoc.unesco.org/ark:/48223/pf0000386693
 
 ## Workplace AI and Worker Well-Being
 
-- U.S. Department of Labor, Artificial Intelligence and Worker Well-being  
-  https://www.dol.gov/general/ai
+- U.S. Department of Labor AI inventory  
+  https://www.dol.gov/agencies/oasam/centers-offices/ocio/ai-inventory
 
-- U.S. Department of Labor AI compliance plan and AI strategy documents  
-  https://www.dol.gov/general/ai
+- U.S. Department of Labor AI strategy  
+  https://www.dol.gov/sites/dolgov/files/general/ai/DOL-2025-AI-Strategies.pdf
+
+- U.S. Department of Labor AI compliance plan  
+  https://www.dol.gov/sites/dolgov/files/general/ai/DOL-2025-AI-Compliance-Plan.pdf
 
 ## HR and Employment AI
 
@@ -82,11 +85,8 @@ Included derived corpus file:
 
 ## Consumer Protection, Marketing Claims, and AI Vendor Trust
 
-- FTC, Artificial Intelligence  
-  https://www.ftc.gov/business-guidance/technology/artificial-intelligence
-
 - FTC, AI Companies: Uphold Your Privacy and Confidentiality Commitments  
-  https://www.ftc.gov/business-guidance/blog/2024/01/ai-companies-uphold-your-privacy-confidentiality-commitments
+  https://www.ftc.gov/policy/advocacy-research/tech-at-ftc/2024/01/ai-companies-uphold-your-privacy-confidentiality-commitments
 
 - FTC, Operation AI Comply  
   https://www.ftc.gov/news-events/news/press-releases/2024/09/ftc-announces-crackdown-deceptive-ai-claims-schemes
@@ -100,10 +100,10 @@ Included derived corpus file:
   https://openai.com/policies/usage-policies/
 
 - Microsoft Responsible AI Transparency Report 2025  
-  https://www.microsoft.com/en-us/ai/responsible-ai
+  https://cdn-dynmedia-1.microsoft.com/is/content/microsoftcorp/microsoft/msc/documents/presentations/CSR/Responsible-AI-Transparency-Report-2025-vertical.pdf
 
 - IBM Principles for Trust and Transparency  
-  https://www.ibm.com/policy/trust-principles/
+  https://www.ibm.com/downloads/documents/us-en/10c31775c3d40dd8
 
 ## Public AI Use Case Inventories
 
