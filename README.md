@@ -154,7 +154,8 @@ risk context plus the behavioral intervention playbook.
 ## App Workflow
 
 1. Choose one of 9 canonical adoption cases or create a custom scenario.
-2. Optionally complete motivation intake with self-reported adoption concerns.
+2. Optionally complete motivation intake to estimate the user's closest profile
+   and strongest value-axis signal from self-reported adoption concerns.
 3. Detect adoption blockers, domain, stakeholders, risk types, and deployment stage.
 4. Retrieve behavioral playbook entries and policy-grounding chunks.
 5. Run four motivation profiles: Achievement, Exploration, Preservation, and Neutral.
