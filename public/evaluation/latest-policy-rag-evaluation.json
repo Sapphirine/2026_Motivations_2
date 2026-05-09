@@ -1,0 +1,646 @@
+{
+  "generatedAt": 1777954001,
+  "corpus": {
+    "canonicalScenarios": 9,
+    "curatedPolicyChunks": 37,
+    "sourcePath": "rag_corpus/policy_chunks.json"
+  },
+  "riskDetection": {
+    "passedScenarios": 9,
+    "totalScenarios": 9,
+    "matchedLabels": 39,
+    "expectedLabels": 39,
+    "labelCoverage": 1,
+    "rows": [
+      {
+        "scenarioId": "coding-assistant-low-trust-evaluation-anxiety",
+        "title": "AI Coding Assistant: Low Trust and Manager Anxiety",
+        "expectedDomain": "software engineering",
+        "detectedDomain": "software engineering",
+        "domainMatched": true,
+        "expectedRiskTypes": [
+          "output accuracy",
+          "security",
+          "surveillance",
+          "worker well-being"
+        ],
+        "detectedRiskTypes": [
+          "surveillance",
+          "privacy",
+          "output accuracy",
+          "human oversight",
+          "confidentiality",
+          "worker well-being",
+          "transparency",
+          "security"
+        ],
+        "matchedRiskTypes": [
+          "output accuracy",
+          "security",
+          "surveillance",
+          "worker well-being"
+        ],
+        "missingRiskTypes": [],
+        "matchedLabels": 5,
+        "expectedLabels": 5,
+        "passed": true
+      },
+      {
+        "scenarioId": "customer-support-ai-draft-rework-risk",
+        "title": "Support Copilot: Draft Quality and Rework Fear",
+        "expectedDomain": "customer support",
+        "detectedDomain": "customer support",
+        "domainMatched": true,
+        "expectedRiskTypes": [
+          "consumer harm",
+          "output accuracy",
+          "human oversight"
+        ],
+        "detectedRiskTypes": [
+          "privacy",
+          "output accuracy",
+          "human oversight",
+          "confidentiality",
+          "model validation",
+          "accountability",
+          "consumer harm",
+          "deceptive claims",
+          "transparency",
+          "worker well-being"
+        ],
+        "matchedRiskTypes": [
+          "consumer harm",
+          "output accuracy",
+          "human oversight"
+        ],
+        "missingRiskTypes": [],
+        "matchedLabels": 4,
+        "expectedLabels": 4,
+        "passed": true
+      },
+      {
+        "scenarioId": "analytics-copilot-data-confidence-gap",
+        "title": "Analytics Copilot: Data Confidence Gap",
+        "expectedDomain": "business analytics",
+        "detectedDomain": "business analytics",
+        "domainMatched": true,
+        "expectedRiskTypes": [
+          "output accuracy",
+          "human oversight",
+          "model validation",
+          "accountability"
+        ],
+        "detectedRiskTypes": [
+          "privacy",
+          "output accuracy",
+          "human oversight",
+          "confidentiality",
+          "model validation",
+          "accountability",
+          "consumer harm",
+          "deceptive claims",
+          "transparency",
+          "worker well-being"
+        ],
+        "matchedRiskTypes": [
+          "output accuracy",
+          "human oversight",
+          "model validation",
+          "accountability"
+        ],
+        "missingRiskTypes": [],
+        "matchedLabels": 5,
+        "expectedLabels": 5,
+        "passed": true
+      },
+      {
+        "scenarioId": "manager-stigma-ai-dependence",
+        "title": "Manager Stigma: AI Use Looks Like Dependence",
+        "expectedDomain": "workplace AI adoption",
+        "detectedDomain": "workplace AI adoption",
+        "domainMatched": true,
+        "expectedRiskTypes": [
+          "worker well-being",
+          "surveillance",
+          "transparency"
+        ],
+        "detectedRiskTypes": [
+          "surveillance",
+          "privacy",
+          "output accuracy",
+          "human oversight",
+          "confidentiality",
+          "model validation",
+          "accountability",
+          "worker well-being",
+          "transparency"
+        ],
+        "matchedRiskTypes": [
+          "worker well-being",
+          "surveillance",
+          "transparency"
+        ],
+        "missingRiskTypes": [],
+        "matchedLabels": 4,
+        "expectedLabels": 4,
+        "passed": true
+      },
+      {
+        "scenarioId": "legal-review-ai-confidentiality-concern",
+        "title": "Legal Review: Confidentiality and Competence Concern",
+        "expectedDomain": "legal operations",
+        "detectedDomain": "legal operations",
+        "domainMatched": true,
+        "expectedRiskTypes": [
+          "confidentiality",
+          "output accuracy",
+          "human oversight"
+        ],
+        "detectedRiskTypes": [
+          "privacy",
+          "output accuracy",
+          "human oversight",
+          "confidentiality",
+          "worker well-being",
+          "transparency"
+        ],
+        "matchedRiskTypes": [
+          "confidentiality",
+          "output accuracy",
+          "human oversight"
+        ],
+        "missingRiskTypes": [],
+        "matchedLabels": 4,
+        "expectedLabels": 4,
+        "passed": true
+      },
+      {
+        "scenarioId": "sales-ai-coach-unclear-use-case",
+        "title": "Sales AI Coach: Unclear Use Case",
+        "expectedDomain": "sales",
+        "detectedDomain": "sales",
+        "domainMatched": true,
+        "expectedRiskTypes": [
+          "consumer harm",
+          "worker well-being",
+          "transparency"
+        ],
+        "detectedRiskTypes": [
+          "output accuracy",
+          "human oversight",
+          "confidentiality",
+          "model validation",
+          "accountability",
+          "consumer harm",
+          "deceptive claims",
+          "transparency",
+          "worker well-being"
+        ],
+        "matchedRiskTypes": [
+          "consumer harm",
+          "worker well-being",
+          "transparency"
+        ],
+        "missingRiskTypes": [],
+        "matchedLabels": 4,
+        "expectedLabels": 4,
+        "passed": true
+      },
+      {
+        "scenarioId": "marketing-ai-content-brand-risk",
+        "title": "Marketing Content AI: Brand Risk",
+        "expectedDomain": "marketing",
+        "detectedDomain": "marketing",
+        "domainMatched": true,
+        "expectedRiskTypes": [
+          "consumer harm",
+          "deceptive claims",
+          "output accuracy"
+        ],
+        "detectedRiskTypes": [
+          "privacy",
+          "output accuracy",
+          "human oversight",
+          "confidentiality",
+          "consumer harm",
+          "deceptive claims",
+          "transparency",
+          "worker well-being"
+        ],
+        "matchedRiskTypes": [
+          "consumer harm",
+          "deceptive claims",
+          "output accuracy"
+        ],
+        "missingRiskTypes": [],
+        "matchedLabels": 4,
+        "expectedLabels": 4,
+        "passed": true
+      },
+      {
+        "scenarioId": "finance-ai-forecasting-accountability-risk",
+        "title": "Finance Forecasting AI: Accountability Risk",
+        "expectedDomain": "finance",
+        "detectedDomain": "finance",
+        "domainMatched": true,
+        "expectedRiskTypes": [
+          "model validation",
+          "accountability",
+          "human oversight"
+        ],
+        "detectedRiskTypes": [
+          "privacy",
+          "confidentiality",
+          "model validation",
+          "accountability",
+          "human oversight",
+          "worker well-being",
+          "transparency"
+        ],
+        "matchedRiskTypes": [
+          "model validation",
+          "accountability",
+          "human oversight"
+        ],
+        "missingRiskTypes": [],
+        "matchedLabels": 4,
+        "expectedLabels": 4,
+        "passed": true
+      },
+      {
+        "scenarioId": "hr-ai-policy-answer-trust-gap",
+        "title": "HR Policy Assistant: Trust Gap",
+        "expectedDomain": "human resources",
+        "detectedDomain": "human resources",
+        "domainMatched": true,
+        "expectedRiskTypes": [
+          "bias and fairness",
+          "human oversight",
+          "privacy",
+          "worker well-being"
+        ],
+        "detectedRiskTypes": [
+          "bias and fairness",
+          "privacy",
+          "output accuracy",
+          "human oversight",
+          "confidentiality",
+          "worker well-being",
+          "transparency"
+        ],
+        "matchedRiskTypes": [
+          "bias and fairness",
+          "human oversight",
+          "privacy",
+          "worker well-being"
+        ],
+        "missingRiskTypes": [],
+        "matchedLabels": 5,
+        "expectedLabels": 5,
+        "passed": true
+      }
+    ]
+  },
+  "retrievalRecall": {
+    "available": true,
+    "recallAt5": 0.5925925925925926,
+    "matchedExpectedChunks": 16,
+    "expectedChunks": 27,
+    "rows": [
+      {
+        "scenarioId": "coding-assistant-low-trust-evaluation-anxiety",
+        "title": "AI Coding Assistant: Low Trust and Manager Anxiety",
+        "enabled": true,
+        "mode": "chroma",
+        "warning": null,
+        "expectedChunkIds": [
+          "software-code-review-001",
+          "nist-genai-profile-content-001",
+          "nist-csf-001"
+        ],
+        "retrievedChunkIds": [
+          "software-code-review-001",
+          "dol-ai-training-001",
+          "dol-ai-transparency-001",
+          "nist-csf-001",
+          "nist-ai-rmf-manage-001"
+        ],
+        "matchedChunkIds": [
+          "software-code-review-001",
+          "nist-csf-001"
+        ],
+        "missingChunkIds": [
+          "nist-genai-profile-content-001"
+        ],
+        "recallAt5": 0.6666666666666666
+      },
+      {
+        "scenarioId": "customer-support-ai-draft-rework-risk",
+        "title": "Support Copilot: Draft Quality and Rework Fear",
+        "enabled": true,
+        "mode": "chroma",
+        "warning": null,
+        "expectedChunkIds": [
+          "support-quality-001",
+          "nist-genai-profile-content-001",
+          "ftc-ai-claims-001"
+        ],
+        "retrievedChunkIds": [
+          "support-quality-001",
+          "nist-ai-rmf-manage-001",
+          "ftc-evolv-001",
+          "ftc-privacy-001",
+          "nist-genai-profile-content-001"
+        ],
+        "matchedChunkIds": [
+          "support-quality-001",
+          "nist-genai-profile-content-001"
+        ],
+        "missingChunkIds": [
+          "ftc-ai-claims-001"
+        ],
+        "recallAt5": 0.6666666666666666
+      },
+      {
+        "scenarioId": "analytics-copilot-data-confidence-gap",
+        "title": "Analytics Copilot: Data Confidence Gap",
+        "enabled": true,
+        "mode": "chroma",
+        "warning": null,
+        "expectedChunkIds": [
+          "nist-ai-rmf-measure-001",
+          "model-risk-management-002",
+          "nist-genai-profile-content-001"
+        ],
+        "retrievedChunkIds": [
+          "nist-ai-rmf-manage-001",
+          "support-quality-001",
+          "nist-ai-rmf-measure-001",
+          "ftc-privacy-001",
+          "ibm-data-ownership-001"
+        ],
+        "matchedChunkIds": [
+          "nist-ai-rmf-measure-001"
+        ],
+        "missingChunkIds": [
+          "model-risk-management-002",
+          "nist-genai-profile-content-001"
+        ],
+        "recallAt5": 0.3333333333333333
+      },
+      {
+        "scenarioId": "manager-stigma-ai-dependence",
+        "title": "Manager Stigma: AI Use Looks Like Dependence",
+        "enabled": true,
+        "mode": "chroma",
+        "warning": null,
+        "expectedChunkIds": [
+          "dol-ai-worker-001",
+          "dol-ai-transparency-001",
+          "ibm-trust-001"
+        ],
+        "retrievedChunkIds": [
+          "dol-ai-worker-001",
+          "dol-ai-transparency-001",
+          "dol-ai-training-001",
+          "ibm-trust-001",
+          "ibm-data-ownership-001"
+        ],
+        "matchedChunkIds": [
+          "dol-ai-worker-001",
+          "dol-ai-transparency-001",
+          "ibm-trust-001"
+        ],
+        "missingChunkIds": [],
+        "recallAt5": 1
+      },
+      {
+        "scenarioId": "legal-review-ai-confidentiality-concern",
+        "title": "Legal Review: Confidentiality and Competence Concern",
+        "enabled": true,
+        "mode": "chroma",
+        "warning": null,
+        "expectedChunkIds": [
+          "aba-legal-ai-001",
+          "aba-legal-confidentiality-001",
+          "nist-genai-profile-data-001"
+        ],
+        "retrievedChunkIds": [
+          "aba-legal-confidentiality-001",
+          "aba-legal-ai-001",
+          "ibm-trust-001",
+          "nist-ai-rmf-manage-001",
+          "ibm-data-ownership-001"
+        ],
+        "matchedChunkIds": [
+          "aba-legal-ai-001",
+          "aba-legal-confidentiality-001"
+        ],
+        "missingChunkIds": [
+          "nist-genai-profile-data-001"
+        ],
+        "recallAt5": 0.6666666666666666
+      },
+      {
+        "scenarioId": "sales-ai-coach-unclear-use-case",
+        "title": "Sales AI Coach: Unclear Use Case",
+        "enabled": true,
+        "mode": "chroma",
+        "warning": null,
+        "expectedChunkIds": [
+          "dol-ai-training-001",
+          "nist-ai-rmf-map-001",
+          "ftc-ai-claims-001"
+        ],
+        "retrievedChunkIds": [
+          "ftc-evolv-001",
+          "ftc-ai-claims-001",
+          "nist-genai-profile-content-001",
+          "support-quality-001",
+          "ibm-trust-001"
+        ],
+        "matchedChunkIds": [
+          "ftc-ai-claims-001"
+        ],
+        "missingChunkIds": [
+          "dol-ai-training-001",
+          "nist-ai-rmf-map-001"
+        ],
+        "recallAt5": 0.3333333333333333
+      },
+      {
+        "scenarioId": "marketing-ai-content-brand-risk",
+        "title": "Marketing Content AI: Brand Risk",
+        "enabled": true,
+        "mode": "chroma",
+        "warning": null,
+        "expectedChunkIds": [
+          "ftc-ai-claims-001",
+          "nist-genai-profile-transparency-001",
+          "nist-genai-profile-content-001"
+        ],
+        "retrievedChunkIds": [
+          "ftc-ai-claims-001",
+          "nist-ai-rmf-manage-001",
+          "ftc-evolv-001",
+          "support-quality-001",
+          "ftc-privacy-001"
+        ],
+        "matchedChunkIds": [
+          "ftc-ai-claims-001"
+        ],
+        "missingChunkIds": [
+          "nist-genai-profile-transparency-001",
+          "nist-genai-profile-content-001"
+        ],
+        "recallAt5": 0.3333333333333333
+      },
+      {
+        "scenarioId": "finance-ai-forecasting-accountability-risk",
+        "title": "Finance Forecasting AI: Accountability Risk",
+        "enabled": true,
+        "mode": "chroma",
+        "warning": null,
+        "expectedChunkIds": [
+          "model-risk-management-001",
+          "model-risk-management-002",
+          "nist-ai-rmf-measure-001"
+        ],
+        "retrievedChunkIds": [
+          "model-risk-management-002",
+          "model-risk-management-001",
+          "nist-ai-rmf-manage-001",
+          "ibm-data-ownership-001",
+          "ibm-trust-001"
+        ],
+        "matchedChunkIds": [
+          "model-risk-management-001",
+          "model-risk-management-002"
+        ],
+        "missingChunkIds": [
+          "nist-ai-rmf-measure-001"
+        ],
+        "recallAt5": 0.6666666666666666
+      },
+      {
+        "scenarioId": "hr-ai-policy-answer-trust-gap",
+        "title": "HR Policy Assistant: Trust Gap",
+        "enabled": true,
+        "mode": "chroma",
+        "warning": null,
+        "expectedChunkIds": [
+          "eeoc-selection-001",
+          "eeoc-accommodation-001",
+          "openai-usage-high-stakes-001"
+        ],
+        "retrievedChunkIds": [
+          "eeoc-accommodation-001",
+          "eeoc-selection-001",
+          "nist-ai-rmf-manage-001",
+          "ibm-trust-001",
+          "dol-ai-training-001"
+        ],
+        "matchedChunkIds": [
+          "eeoc-selection-001",
+          "eeoc-accommodation-001"
+        ],
+        "missingChunkIds": [
+          "openai-usage-high-stakes-001"
+        ],
+        "recallAt5": 0.6666666666666666
+      }
+    ]
+  },
+  "constraintUptake": {
+    "available": true,
+    "evaluatedOutputs": 180,
+    "outputsWithCompliance": 180,
+    "passOutputs": 110,
+    "reviewOutputs": 70,
+    "unavailableOutputs": 0,
+    "uptakeRate": 0.6111111111111112,
+    "rows": [
+      {
+        "scenarioId": "coding-assistant-low-trust-evaluation-anxiety",
+        "title": "AI Coding Assistant: Low Trust and Manager Anxiety",
+        "runId": "localrun_coding_assistant_low_trust_evaluation_anxiety",
+        "evaluatedOutputs": 20,
+        "pass": 16,
+        "review": 4,
+        "unavailable": 0
+      },
+      {
+        "scenarioId": "customer-support-ai-draft-rework-risk",
+        "title": "Support Copilot: Draft Quality and Rework Fear",
+        "runId": "localrun_customer_support_ai_draft_rework_risk",
+        "evaluatedOutputs": 20,
+        "pass": 11,
+        "review": 9,
+        "unavailable": 0
+      },
+      {
+        "scenarioId": "analytics-copilot-data-confidence-gap",
+        "title": "Analytics Copilot: Data Confidence Gap",
+        "runId": "localrun_analytics_copilot_data_confidence_gap",
+        "evaluatedOutputs": 20,
+        "pass": 20,
+        "review": 0,
+        "unavailable": 0
+      },
+      {
+        "scenarioId": "manager-stigma-ai-dependence",
+        "title": "Manager Stigma: AI Use Looks Like Dependence",
+        "runId": "localrun_manager_stigma_ai_dependence",
+        "evaluatedOutputs": 20,
+        "pass": 17,
+        "review": 3,
+        "unavailable": 0
+      },
+      {
+        "scenarioId": "legal-review-ai-confidentiality-concern",
+        "title": "Legal Review: Confidentiality and Competence Concern",
+        "runId": "localrun_legal_review_ai_confidentiality_concern",
+        "evaluatedOutputs": 20,
+        "pass": 3,
+        "review": 17,
+        "unavailable": 0
+      },
+      {
+        "scenarioId": "sales-ai-coach-unclear-use-case",
+        "title": "Sales AI Coach: Unclear Use Case",
+        "runId": "localrun_sales_ai_coach_unclear_use_case",
+        "evaluatedOutputs": 20,
+        "pass": 20,
+        "review": 0,
+        "unavailable": 0
+      },
+      {
+        "scenarioId": "marketing-ai-content-brand-risk",
+        "title": "Marketing Content AI: Brand Risk",
+        "runId": "localrun_marketing_ai_content_brand_risk",
+        "evaluatedOutputs": 20,
+        "pass": 3,
+        "review": 17,
+        "unavailable": 0
+      },
+      {
+        "scenarioId": "finance-ai-forecasting-accountability-risk",
+        "title": "Finance Forecasting AI: Accountability Risk",
+        "runId": "localrun_finance_ai_forecasting_accountability_risk",
+        "evaluatedOutputs": 20,
+        "pass": 15,
+        "review": 5,
+        "unavailable": 0
+      },
+      {
+        "scenarioId": "hr-ai-policy-answer-trust-gap",
+        "title": "HR Policy Assistant: Trust Gap",
+        "runId": "localrun_hr_ai_policy_answer_trust_gap",
+        "evaluatedOutputs": 20,
+        "pass": 5,
+        "review": 15,
+        "unavailable": 0
+      }
+    ]
+  }
+}

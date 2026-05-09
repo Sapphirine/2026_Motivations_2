@@ -8,26 +8,21 @@ dist/
 .env
 .dev.vars
 
-# Research-grade intermediate dumps (canonical evidence is served from R2).
+# Research-grade intermediate dumps. Keep the final paper-grade evaluation
+# artifacts trackable so the report's reproducibility references resolve on
+# GitHub.
 research-data/
-evaluation-results/
-public/evaluation/latest-local-evaluation.json
-public/evaluation/latest-policy-rag-evaluation.json
-
-# Internal planning artifacts — not part of the published deliverable.
-01-spec.md
-02-design.md
-03-ui-design.md
-04-implementation-plan.md
-05-progress.md
-06-test-plan.md
-07-deployment.md
-.ux-map/
-navigationflow.md
+evaluation-results/*
+!evaluation-results/
+!evaluation-results/local-canonical-evaluation.raw.json
+!evaluation-results/local-canonical-evaluation.summary.json
+public/evaluation/*
+!public/evaluation/
+!public/evaluation/latest-local-evaluation.json
+!public/evaluation/latest-policy-rag-evaluation.json
 
 # Local/generated project artifacts.
 migrations/
-public/final_project.pdf
 
 # Local Playwright/QA helpers.
 /tmp/

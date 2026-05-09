@@ -20,6 +20,10 @@ surface for the scenario, retrieves responsible-AI policy constraints from a
 local Chroma vector store, and asks the agents to generate interventions that
 remain compatible with those constraints.
 
+## Team
+
+- Chih-Hsin Chen (`cc5240`)
+
 ## Why this matters
 
 Enterprise AI spend is already large, but business value is uneven:
@@ -175,23 +179,94 @@ L3 rationale: reduce uncertainty + build confidence.
 Classification: Aligned.
 ```
 
-## Repository map
+## Repository Layout
 
-- `src/domain/seeds.ts` - 9 AI workflow adoption cases and 4 motivation profiles.
-- `src/domain/intervention-playbook.ts` - heuristic playbook retrieval layer.
-- `src/services/policy-rag.ts` - risk detection, policy-RAG client, and
-  lightweight policy compliance check.
-- `src/services/prompts.ts` - MotiveOps prompt translation.
-- `src/services/provider.ts` - OpenAI/mock provider and moderator commentary.
-- `src/judges/value-judge.ts` - L2 intervention motivation judge.
-- `src/extractors/rationale-values.ts` - L3 rationale motivation extractor.
-- `src/experiments/canonical-battery.ts` - 9-case canonical battery runner.
-- `src/experiments/sensitivity-grid.ts` - load-bearing sensitivity heatmap runner.
-- `src/App.jsx` and `src/ui/` - 5-tab research UI.
-- `rag_corpus/policy_chunks.json` - curated policy-grounding chunks.
-- `rag_server/policy_rag_server.py` - local Chroma policy-RAG sidecar.
-- `final_program_tex/final_project.tex` - final report source outside this
-  Vite app directory.
+```text
+MotiveOps/
+├── README.md                                   // Project overview, setup, evaluation, and reproducibility guide.
+├── package.json                                // Node scripts and frontend/Worker dependencies.
+├── dev.vars.example                            // Template for local Worker/OpenAI/RAG environment variables.
+├── wrangler.toml                               // Cloudflare Worker local-development configuration.
+├── vite.config.js                              // Vite config and local API proxy setup.
+├── index.html                                  // Vite app HTML entry point.
+├── src/                                        // Main React UI, Worker API, domain data, and evaluation logic.
+│   ├── App.jsx                                 // Five-tab research console and demo workflow.
+│   ├── main.jsx                                // React entry point.
+│   ├── worker.ts                               // Hono Worker API with scenario, run, audit, RAG, and artifact routes.
+│   ├── api/
+│   │   └── schemas.ts                          // Zod schemas shared across Worker endpoints.
+│   ├── domain/
+│   │   ├── seeds.ts                            // Full 9 canonical scenarios, intervention options, and 4 motivation profiles.
+│   │   └── intervention-playbook.ts            // Behavioral intervention playbook and blocker-to-strategy retrieval.
+│   ├── services/
+│   │   ├── prompts.ts                          // Subject-agent prompt assembly and JSON output contract.
+│   │   ├── policy-rag.ts                       // Risk detection, local RAG client, and policy-coverage checks.
+│   │   ├── experiment.ts                       // Multi-profile agent run orchestration.
+│   │   ├── artifacts.ts                        // Evidence export and report artifact helpers.
+│   │   ├── storage.ts                          // In-memory/local persistence abstraction.
+│   │   ├── provider.ts                         // OpenAI and deterministic demo providers.
+│   │   ├── metrics.ts                          // Evaluation and summary metric helpers.
+│   │   ├── config.ts                           // Runtime model and feature configuration.
+│   │   └── problem.ts                          // Shared error/problem response helpers.
+│   ├── experiments/
+│   │   ├── canonical-battery.ts                // Worker endpoint runner for the 9-case canonical battery.
+│   │   ├── sensitivity-grid.ts                 // Low-vs-high motivation-axis perturbation grid.
+│   │   ├── adoption-evaluation.ts              // Adoption-specific evaluation helpers.
+│   │   └── policy-rag-evaluation.ts            // Policy retrieval and constraint-uptake evaluation.
+│   ├── analysis/
+│   │   ├── three-layer-runner.ts               // L1/L2/L3 motivation audit orchestration.
+│   │   └── alignment-pattern.ts                // Aligned/rationalizing/drifting/contradictory classification logic.
+│   ├── judges/
+│   │   └── value-judge.ts                      // L2 selected-action motivation classifier prompt and parser.
+│   ├── extractors/
+│   │   └── rationale-values.ts                 // L3 rationale-axis lexicon and fallback classifier.
+│   └── ui/                                     // Reusable UI components for agents, compass, heatmap, tabs, and evidence.
+├── scripts/
+│   └── run-local-evaluation.ts                 // Standalone local OpenAI canonical evaluation runner.
+├── rag_server/
+│   ├── policy_rag_server.py                    // Local Chroma policy-RAG sidecar API.
+│   └── requirements.txt                        // Python dependencies for the RAG sidecar.
+├── rag_corpus/
+│   └── policy_chunks.json                      // Runtime policy-grounding chunks loaded into Chroma.
+├── doc/                                        // Public source documents and derived policy-corpus documentation.
+│   ├── sources.md                              // Source list for the policy-grounding corpus.
+│   ├── policy_chunks.json                      // Human-readable copy of the 37 curated policy chunks.
+│   └── <source files>.pdf/.csv/.xlsx           // Public source documents used to curate policy chunks.
+├── evaluation-results/
+│   ├── local-canonical-evaluation.raw.json     // Full local canonical run state and generated outputs.
+│   └── local-canonical-evaluation.summary.json // Paper-ready summary metrics.
+├── public/evaluation/
+│   ├── latest-local-evaluation.json            // Frontend copy of the canonical evaluation summary.
+│   └── latest-policy-rag-evaluation.json       // Frontend copy of the policy-RAG evaluation summary.
+```
+
+## Reproducibility assets
+
+The paper keeps the scenario and prompt details compact for space. The full
+materials used to reproduce the reported evaluation are in the repository:
+
+- **Full canonical scenarios**: `src/domain/seeds.ts` contains the 9 canonical
+  adoption cases, including full scenario context, stakeholders, tradeoffs,
+  motivational conflict notes, and all intervention options.
+- **Motivation profiles and prompt assembly**: `src/domain/seeds.ts` stores the
+  four profile weights and profile translations; `src/services/prompts.ts`
+  builds the subject-agent prompt used for generation.
+- **Audit prompt contracts**: `src/judges/value-judge.ts` contains the L2
+  selected-action classifier prompt, and `src/extractors/rationale-values.ts`
+  contains the L3 rationale-axis extractor and fallback classifier prompt.
+- **Policy corpus and source list**: `doc/sources.md` lists the public policy
+  sources; `doc/policy_chunks.json` and `rag_corpus/policy_chunks.json` contain
+  the 37 curated policy-grounding chunks used by the local RAG sidecar.
+- **Generated evaluation artifacts**:
+  `evaluation-results/local-canonical-evaluation.raw.json` contains the full
+  local canonical run state; `evaluation-results/local-canonical-evaluation.summary.json`
+  contains the paper-ready metrics; `public/evaluation/latest-local-evaluation.json`
+  and `public/evaluation/latest-policy-rag-evaluation.json` are the frontend
+  copies loaded by the Method / Report tab.
+- **Generated report tables/figures**: `final_program_tex/local_eval_results.tex`,
+  `final_program_tex/policy_rag_eval_results.tex`, and
+  `final_program_tex/full_eval_heatmap.tex` are the generated LaTeX artifacts
+  used by the report.
 
 ## Local setup
 
@@ -334,7 +409,10 @@ Generated artifacts:
 - `evaluation-results/local-canonical-evaluation.raw.json` - full local run state.
 - `evaluation-results/local-canonical-evaluation.summary.json` - paper-ready metrics.
 - `public/evaluation/latest-local-evaluation.json` - loaded by the Method / Report tab.
+- `public/evaluation/latest-policy-rag-evaluation.json` - loaded by the policy-RAG evaluation panel.
 - `final_program_tex/local_eval_results.tex` - included by `final_project.tex`.
+- `final_program_tex/policy_rag_eval_results.tex` - policy-RAG evaluation table.
+- `final_program_tex/full_eval_heatmap.tex` - compact 144-cell sensitivity heatmap.
 
 For a deterministic smoke test, keep `.dev.vars` in demo mode and pass
 `--demo` explicitly:
