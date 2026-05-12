@@ -12,7 +12,7 @@ optionally retrieves responsible-AI constraints from a local policy RAG sidecar,
 runs four controlled motivation-profile agents, recommends a small next action,
 and audits whether the action and rationale match the declared motivation frame.
 
-## Team
+## Motivation 2 Group (202605-24)
 
 - Chih-Hsin Chen (`cc5240`)
 
