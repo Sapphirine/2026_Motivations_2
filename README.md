@@ -19,7 +19,7 @@ and audits whether the action and rationale match the declared motivation frame.
 ## Project Links
 
 - Demo video: https://youtu.be/Y1ficoPgtyU
-- GitHub repository: https://github.com/nomnomeriii/eecs6895-final
+- GitHub repository: https://github.com/Sapphirine/2026_Motivations_2
 
 ## Repository Layout
 
